@@ -11,13 +11,11 @@ services:
     restart: on-failure
     stop_grace_period: 30s
     init: true
+    command: ["/app/axelive.bin", "--replace-instance"]
     environment:
       AXELIVE_HOME: /data
       AXELIVE_PORT: 5210
       AXELIVE_HOST: 0.0.0.0
       AXELIVE_OPEN_UI: 0
-      # Containers restart with PID 1; AxeLive's instance lock is PID-based.
-      # Bypass the lock in Umbrel containers to avoid false "instance already running".
-      AXELIVE_LICENSE_BYPASS: "1"
     volumes:
       - ${APP_DATA_DIR}/data:/data

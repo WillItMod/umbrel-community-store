@@ -15,5 +15,9 @@ services:
       AXE_HOST: 0.0.0.0
       AXE_PORT: 5000
       HOME: /data
+      # IMPORTANT: Do not grant paid tiers by default.
+      # AxeBench's default is to use a hosted licensing server; disabling it keeps the app in free mode
+      # unless the operator explicitly configures licensing.
+      AXEBENCH_LICENSE_SERVER: disabled
     volumes:
       - ${APP_DATA_DIR}/data:/data
