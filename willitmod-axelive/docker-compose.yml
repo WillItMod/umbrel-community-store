@@ -3,7 +3,7 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: axelive_server_1
+      APP_HOST: willitmod-axelive_server_1
       APP_PORT: 5210
 
   server:
