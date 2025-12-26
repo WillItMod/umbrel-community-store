@@ -13,10 +13,10 @@ repo: https://github.com/WillItMod/AxeLive-Release
 support: https://github.com/WillItMod/AxeLive-Release/issues
 dependencies: []
 port: 5210
+gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: >-
-  Initial Umbrel packaging for AxeLive.
+releaseNotes: ""
 submitter: WillItMod
 submission: ""
