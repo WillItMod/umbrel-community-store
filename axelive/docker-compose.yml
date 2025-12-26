@@ -1,0 +1,23 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: axelive_server_1
+      APP_PORT: 5210
+
+  server:
+    image: ghcr.io/willitmod/axelive-release:v1.1-beta13@sha256:17f139115b51447b16ffe0ca218347264041ed0f351a71442eca8d3e2c2afab1
+    restart: on-failure
+    stop_grace_period: 30s
+    init: true
+    environment:
+      AXELIVE_HOME: /data
+      AXELIVE_PORT: 5210
+      AXELIVE_HOST: 0.0.0.0
+      AXELIVE_OPEN_UI: 0
+      # Containers restart with PID 1; AxeLive's instance lock is PID-based.
+      # Bypass the lock in Umbrel containers to avoid false "instance already running".
+      AXELIVE_LICENSE_BYPASS: "1"
+    volumes:
+      - ${APP_DATA_DIR}/data:/data

@@ -1,0 +1,22 @@
+manifestVersion: 1
+id: axebench
+category: bitcoin
+name: AxeBench
+version: "3.0.1-alpha"
+tagline: Bitaxe fleet benchmarking and management
+description: >-
+  AxeBench is a web UI for managing and benchmarking supported miners, with fleet-level views,
+  profiles, and automation.
+developer: WillItMod
+website: https://github.com/WillItMod/axebench-matrix-ui
+repo: https://github.com/WillItMod/axebench-matrix-ui
+support: https://github.com/WillItMod/axebench-matrix-ui/issues
+dependencies: []
+port: 5000
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: >-
+  Initial Umbrel packaging for AxeBench.
+submitter: WillItMod
+submission: ""
