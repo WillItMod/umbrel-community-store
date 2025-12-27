@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axebench
 category: bitcoin
 name: AxeBench
-version: "3.0.1-alpha"
+version: "3.0.2"
 tagline: Bitaxe fleet benchmarking and management
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/icon.svg
 description: >-

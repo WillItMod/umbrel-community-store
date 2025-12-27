@@ -7,11 +7,10 @@ services:
       APP_PORT: 5210
 
   server:
-    image: ghcr.io/willitmod/axelive-release:v1.1-beta13@sha256:17f139115b51447b16ffe0ca218347264041ed0f351a71442eca8d3e2c2afab1
+    image: ghcr.io/willitmod/axelive-release:v1.2
     restart: on-failure
     stop_grace_period: 30s
     init: true
-    command: ["/app/axelive.bin", "--replace-instance"]
     environment:
       AXELIVE_HOME: /data
       AXELIVE_PORT: 5210
