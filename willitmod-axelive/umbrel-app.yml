@@ -19,6 +19,7 @@ gallery:
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-releaseNotes: ""
+releaseNotes: >-
+  Rebuilt container for v1.2. If you installed previously and see issues, uninstall/reinstall to pull the latest image.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c
