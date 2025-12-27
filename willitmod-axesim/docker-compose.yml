@@ -1,0 +1,20 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: axesim_server_1
+      APP_PORT: 8081
+
+  server:
+    image: ghcr.io/willitmod/axesim-release:v1.0
+    restart: on-failure
+    stop_grace_period: 30s
+    init: true
+    environment:
+      AXESIM_HOME: /data
+      AXESIM_PORT: 8081
+      AXESIM_HOST: 0.0.0.0
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+
