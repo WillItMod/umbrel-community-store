@@ -3,7 +3,7 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: axesim_server_1
+      APP_HOST: willitmod-axesim_server_1
       APP_PORT: 8081
 
   server:
@@ -17,4 +17,3 @@ services:
       AXESIM_HOST: 0.0.0.0
     volumes:
       - ${APP_DATA_DIR}/data:/data
-

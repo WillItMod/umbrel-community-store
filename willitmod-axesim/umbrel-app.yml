@@ -1,5 +1,5 @@
 manifestVersion: 1
-id: axesim
+id: willitmod-axesim
 category: bitcoin
 name: AxeSim
 version: "1.0"
@@ -21,4 +21,3 @@ releaseNotes: >-
   Initial Umbrel packaging for AxeSim.
 submitter: WillItMod
 submission: ""
-
