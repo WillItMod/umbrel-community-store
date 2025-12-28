@@ -4,7 +4,7 @@ category: bitcoin
 name: AxeSim
 version: "1.0.5"
 tagline: Virtual miner simulator
-icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axesim/icon.svg
+icon: icon.svg
 description: >-
   AxeSim is a virtual miner simulator you can use to test AxeLive and AxeBench
   without real hardware. It emulates common miner endpoints and produces
@@ -15,7 +15,7 @@ support: https://github.com/WillItMod/AxeSim-Release/issues
 dependencies: []
 port: 8081
 gallery:
-  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axesim/icon.png
+  - icon.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""

@@ -7,10 +7,12 @@ services:
       APP_PORT: 5210
 
   server:
-    image: ghcr.io/willitmod/axelive-release:v1.2
+    image: ghcr.io/willitmod/axelive-release:v1.2-r1
     restart: on-failure
     stop_grace_period: 30s
     init: true
+    ports:
+      - "5210:5210"
     environment:
       AXELIVE_HOME: /data
       AXELIVE_PORT: 5210

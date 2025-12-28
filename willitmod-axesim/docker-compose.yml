@@ -11,6 +11,8 @@ services:
     restart: on-failure
     stop_grace_period: 30s
     init: true
+    ports:
+      - "8081:8081"
     environment:
       AXESIM_HOME: /data
       AXESIM_PORT: 8081
