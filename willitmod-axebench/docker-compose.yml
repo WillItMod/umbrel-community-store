@@ -11,8 +11,6 @@ services:
     restart: on-failure
     stop_grace_period: 30s
     init: true
-    ports:
-      - "5000:5000"
     environment:
       AXE_HOST: 0.0.0.0
       AXE_PORT: 5000

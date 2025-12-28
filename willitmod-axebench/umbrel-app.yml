@@ -25,6 +25,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Multi-arch container rebuild for v3.0.2 (amd64 + arm64) with direct LAN port mapping enabled.
+  Multi-arch container rebuild for v3.0.2 (amd64 + arm64). Note: this Umbrel app does not bind a fixed host port to avoid port conflicts; access it via Umbrel.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c

@@ -11,8 +11,6 @@ services:
     restart: on-failure
     stop_grace_period: 30s
     init: true
-    ports:
-      - "5210:5210"
     environment:
       AXELIVE_HOME: /data
       AXELIVE_PORT: 5210
