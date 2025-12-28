@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axesim
 category: bitcoin
 name: AxeSim
-version: "1.0.2"
+version: "1.0.3"
 tagline: Virtual miner simulator
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axesim/icon.svg
 description: >-
@@ -21,6 +21,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  New: Multi-miner support (add/delete miners and switch between them).
+  Fix: Multi-miner UX (select, rename) + many more models + better thermals.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/c70d9a6
