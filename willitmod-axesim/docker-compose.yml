@@ -11,11 +11,20 @@ services:
     restart: on-failure
     stop_grace_period: 30s
     init: true
-    ports:
-      - "8801-8810:8801-8810"
     environment:
       AXESIM_HOME: /data
       AXESIM_PORT: 8081
       AXESIM_HOST: 0.0.0.0
     volumes:
       - ${APP_DATA_DIR}/data:/data
+
+  miner_proxy:
+    image: nginx:1.27-alpine
+    restart: on-failure
+    init: true
+    depends_on:
+      - server
+    ports:
+      - "8801-8810:8801-8810"
+    volumes:
+      - ./miner-proxy.conf:/etc/nginx/conf.d/default.conf:ro
