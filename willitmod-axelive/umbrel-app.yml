@@ -4,7 +4,7 @@ category: bitcoin
 name: AxeLive
 version: "1.2"
 tagline: Real-time miner monitoring and thermal control
-icon: icon.svg
+icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axelive/icon.svg
 description: >-
   AxeLive is a web UI and controller for supported miners, focused on safe thermal governance,
   stable fan control, and fleet management.
@@ -14,7 +14,9 @@ support: https://github.com/WillItMod/AxeLive-Release/issues
 dependencies: []
 port: 5210
 gallery:
-  - icon.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axelive/1.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axelive/2.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axelive/3.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""

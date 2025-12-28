@@ -4,7 +4,7 @@ category: bitcoin
 name: AxeBench
 version: "3.0.2"
 tagline: Bitaxe fleet benchmarking and management
-icon: icon.svg
+icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/icon.svg
 description: >-
   AxeBench is a web UI for managing and benchmarking supported miners, with fleet-level views,
   profiles, and automation.
@@ -14,7 +14,13 @@ support: https://github.com/WillItMod/AxeBench-Release/issues
 dependencies: []
 port: 5000
 gallery:
-  - icon.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/1.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/2.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/3.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/4.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/5.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/6.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/7.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""
