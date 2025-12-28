@@ -27,4 +27,4 @@ defaultPassword: ""
 releaseNotes: >-
   Fix: full model list, selection stability, better readability + digital rain toggle. Now multi-arch images. Expose 10 virtual miner ports (`8801-8810`) for external tools. Virtual devices only (no real hashing/mining).
 submitter: WillItMod
-submission: https://github.com/WillItMod/umbrel-community-store/commit/c70d9a6
+submission: https://github.com/WillItMod/umbrel-community-store/commit/a5c82a8
