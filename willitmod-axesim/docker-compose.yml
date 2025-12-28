@@ -12,7 +12,6 @@ services:
     stop_grace_period: 30s
     init: true
     ports:
-      - "8081:8081"
       - "8801-8810:8801-8810"
     environment:
       AXESIM_HOME: /data
