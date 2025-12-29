@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axesim
 category: bitcoin
 name: AxeSim
-version: "1.0.7"
+version: "1.0.8"
 tagline: Virtual miner simulator
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axesim/icon.png
 description: >-

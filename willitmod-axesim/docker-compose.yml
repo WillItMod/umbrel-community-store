@@ -7,7 +7,7 @@ services:
       APP_PORT: 8081
 
   server:
-    image: ghcr.io/willitmod/axesim-release:v1.0.7@sha256:d4c3203d50232795e04bc6cebc4ba949ea0cd871e1bf86c8ea12d3d1434f0eef
+    image: ghcr.io/willitmod/axesim-release:v1.0.8@sha256:2caa2eb6df234f0930ec51bc131f6cd0498bdc34e2ce0421220a71a8db3c6f37
     restart: on-failure
     stop_grace_period: 30s
     init: true
