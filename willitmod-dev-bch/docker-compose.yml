@@ -109,7 +109,47 @@ services:
       BCH_RPC_USER: "bch"
       BCH_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
+      APP_VERSION: "0.6.4-alpha"
+      UI_SOURCE_BASE: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch"
       APP_CHANNEL: "ALPHA"
       BCHN_IMAGE: "mainnet/bitcoin-cash-node:v28.0.1@sha256:eb667e2a483ff780d047a16ee59799dd45ad46c25fa96a9372f86d10bd6250fa"
       CKPOOL_IMAGE: "ghcr.io/getumbrel/docker-ckpool-solo:590fb2a@sha256:4e6b8f4f9c7d74c2111a6e082a2bbdc936fa510989a81e7cef714d1da944336b"
-    command: ["python", "/data/ui/app.py"]
+    command: |-
+      python - <<'PY'
+      import os
+      import sys
+      import urllib.request
+
+      base = os.environ.get("UI_SOURCE_BASE", "").rstrip("/")
+      version = os.environ.get("APP_VERSION", "")
+      ui_dir = "/data/ui"
+      static_dir = os.path.join(ui_dir, "static")
+      version_path = os.path.join(ui_dir, "VERSION")
+
+      def read_text(path):
+        try:
+          with open(path, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+        except Exception:
+          return ""
+
+      if base and version:
+        current = read_text(version_path)
+        if current != version:
+          os.makedirs(static_dir, exist_ok=True)
+          for rel in ["data/ui/app.py", "data/ui/static/index.html", "data/ui/static/app.js", "data/ui/static/app.css"]:
+            url = f"{base}/{rel}"
+            dest = os.path.join("/data", rel)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            try:
+              urllib.request.urlretrieve(url, dest)
+            except Exception:
+              pass
+          try:
+            with open(version_path, "w", encoding="utf-8") as fh:
+              fh.write(f"{version}\n")
+          except Exception:
+            pass
+
+      os.execv(sys.executable, [sys.executable, "/data/ui/app.py"])
+      PY
