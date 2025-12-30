@@ -8,50 +8,14 @@ services:
       APP_PORT: 3000
 
   init:
-    image: alpine:3.22.1@sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1
-    entrypoint: >-
-      /bin/sh -c '
-        set -euo pipefail
-        apk add --no-cache envsubst curl >/dev/null
-
-        mkdir -p /data/node /data/pool/config /data/pool/www/pool /data/ui/static
-
-        if [ -n "$$APP_VERSION" ] && [ -n "$$UI_SOURCE_BASE" ]; then
-          current="$$(cat /data/ui/VERSION 2>/dev/null || true)"
-          if [ "$$current" != "$$APP_VERSION" ]; then
-            echo "[axebch] Updating UI to $$APP_VERSION"
-            curl -fsSL "$$UI_SOURCE_BASE/data/ui/app.py" -o /data/ui/app.py
-            curl -fsSL "$$UI_SOURCE_BASE/data/ui/static/index.html" -o /data/ui/static/index.html
-            curl -fsSL "$$UI_SOURCE_BASE/data/ui/static/app.js" -o /data/ui/static/app.js
-            curl -fsSL "$$UI_SOURCE_BASE/data/ui/static/app.css" -o /data/ui/static/app.css
-            printf "%s\n" "$$APP_VERSION" > /data/ui/VERSION
-            chown -R 1000:1000 /data/ui
-          fi
-        fi
-
-        if [ ! -f /data/node/bitcoin.conf ]; then
-          envsubst < /data/templates/bitcoin.conf.template > /data/node/bitcoin.conf
-          chown -R 1000:1000 /data/node
-        fi
-
-        if [ ! -f /data/pool/config/ckpool.conf ]; then
-          envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
-          chown -R 1000:1000 /data/pool
-        else
-          # Safety: ckpool defaults to a donation address if btcaddress is omitted.
-          # Force regen with a placeholder so users must configure their own payout address.
-          if ! grep -q '\"btcaddress\"' /data/pool/config/ckpool.conf; then
-            mv /data/pool/config/ckpool.conf "/data/pool/config/ckpool.conf.bak.$(date +%s || echo 0)" || true
-            envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
-            chown -R 1000:1000 /data/pool
-          fi
-        fi
-      '
+    image: alpine:3.22.1
+    entrypoint: ["/bin/sh", "/init-entrypoint.sh"]
     volumes:
       - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}/data/templates/init-entrypoint.sh:/init-entrypoint.sh:ro
     environment:
       APPS_SUBNET: "${NETWORK_IP}/16"
-      APP_VERSION: "0.6.5-alpha"
+      APP_VERSION: "0.6.7-alpha"
       UI_SOURCE_BASE: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch"
       RPC_USER: "bch"
       RPC_PASSWORD: "${APP_PASSWORD}"
@@ -61,7 +25,7 @@ services:
       PAYOUT_ADDRESS: "CHANGEME_BCH_PAYOUT_ADDRESS"
 
   bchn:
-    image: mainnet/bitcoin-cash-node:v28.0.1@sha256:eb667e2a483ff780d047a16ee59799dd45ad46c25fa96a9372f86d10bd6250fa
+    image: mainnet/bitcoin-cash-node:v28.0.1
     user: "1000:1000"
     restart: unless-stopped
     stop_grace_period: 15m30s
@@ -74,9 +38,15 @@ services:
       - ${APP_DATA_DIR}/data/node:/data
       - ${APP_DATA_DIR}/data/templates/bchn-entrypoint.sh:/bchn-entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/bchn-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "bitcoin-cli -datadir=/data getblockchaininfo >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 2m
 
   ckpool:
-    image: ghcr.io/getumbrel/docker-ckpool-solo:590fb2a@sha256:4e6b8f4f9c7d74c2111a6e082a2bbdc936fa510989a81e7cef714d1da944336b
+    image: ghcr.io/getumbrel/docker-ckpool-solo:590fb2a
     command: "-k -B -c /config/ckpool.conf"
     user: "1000:1000"
     depends_on:
@@ -90,7 +60,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: python:3.11-alpine@sha256:c825a02ff096b3dc3d362015f9e9f6527f66b73e11f9ad2db1f0da4e09ba7030
+    image: python:3.11-alpine
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -109,48 +79,7 @@ services:
       BCH_RPC_USER: "bch"
       BCH_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
-      APP_VERSION: "0.6.4-alpha"
-      UI_SOURCE_BASE: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch"
       APP_CHANNEL: "ALPHA"
-      BCHN_IMAGE: "mainnet/bitcoin-cash-node:v28.0.1@sha256:eb667e2a483ff780d047a16ee59799dd45ad46c25fa96a9372f86d10bd6250fa"
-      CKPOOL_IMAGE: "ghcr.io/getumbrel/docker-ckpool-solo:590fb2a@sha256:4e6b8f4f9c7d74c2111a6e082a2bbdc936fa510989a81e7cef714d1da944336b"
-    entrypoint: ["/bin/sh", "-ec"]
-    command: |-
-      python - <<'PY'
-      import os
-      import sys
-      import urllib.request
-
-      base = os.environ.get("UI_SOURCE_BASE", "").rstrip("/")
-      version = os.environ.get("APP_VERSION", "")
-      ui_dir = "/data/ui"
-      static_dir = os.path.join(ui_dir, "static")
-      version_path = os.path.join(ui_dir, "VERSION")
-
-      def read_text(path):
-        try:
-          with open(path, "r", encoding="utf-8") as fh:
-            return fh.read().strip()
-        except Exception:
-          return ""
-
-      if base and version:
-        current = read_text(version_path)
-        if current != version:
-          os.makedirs(static_dir, exist_ok=True)
-          for rel in ["data/ui/app.py", "data/ui/static/index.html", "data/ui/static/app.js", "data/ui/static/app.css"]:
-            url = f"{base}/{rel}"
-            dest = os.path.join("/data", rel)
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            try:
-              urllib.request.urlretrieve(url, dest)
-            except Exception:
-              pass
-          try:
-            with open(version_path, "w", encoding="utf-8") as fh:
-              fh.write(f"{version}\n")
-          except Exception:
-            pass
-
-      os.execv(sys.executable, [sys.executable, "/data/ui/app.py"])
-      PY
+      BCHN_IMAGE: "mainnet/bitcoin-cash-node:v28.0.1"
+      CKPOOL_IMAGE: "ghcr.io/getumbrel/docker-ckpool-solo:590fb2a"
+    command: ["python", "/data/ui/app.py"]
