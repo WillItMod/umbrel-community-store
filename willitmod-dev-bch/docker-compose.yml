@@ -54,6 +54,10 @@ services:
             needs_ckpool_regen=1
           fi
           if [ "$$needs_ckpool_regen" -eq 1 ]; then
+            existing_addr="$$(grep -oE '\"btcaddress\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' /data/pool/config/ckpool.conf | head -n 1 | sed -E 's/.*\"btcaddress\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\\1/' || true)"
+            if [ -n "$$existing_addr" ] && [ "$$existing_addr" != "CHANGEME_BCH_PAYOUT_ADDRESS" ]; then
+              export PAYOUT_ADDRESS="$$existing_addr"
+            fi
             mv /data/pool/config/ckpool.conf "/data/pool/config/ckpool.conf.bak.$(date +%s 2>/dev/null || echo 0)" || true
             envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
             chown -R 1000:1000 /data/pool
@@ -96,7 +100,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebch-app:0.7.20-alpha
+    image: ghcr.io/willitmod/axebch-app:0.7.21-alpha
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
