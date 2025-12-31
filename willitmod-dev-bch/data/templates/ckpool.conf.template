@@ -13,5 +13,7 @@
   "startdiff": 16,
   "maxdiff": 0,
   "logdir": "/www",
+  "webdir": "/www/pool",
+  "userdir": "/www/users",
   "zmqblock": "tcp://bchn:${BCH_ZMQ_HASHBLOCK_PORT}"
 }

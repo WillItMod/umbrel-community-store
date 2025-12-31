@@ -13,7 +13,7 @@ services:
       - ${APP_DATA_DIR}/data:/data
     environment:
       APPS_SUBNET: "${NETWORK_IP}/16"
-      APP_VERSION: "0.7.3-alpha"
+      APP_VERSION: "0.7.7-alpha"
       UI_SOURCE_BASE: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch"
       RPC_USER: "bch"
       RPC_PASSWORD: "${APP_PASSWORD}"
@@ -29,7 +29,7 @@ services:
 
         apk add --no-cache envsubst curl >/dev/null
 
-        mkdir -p /data/node /data/pool/config /data/pool/www/pool /data/ui/static /data/templates
+        mkdir -p /data/node /data/pool/config /data/pool/www/pool /data/pool/www/users /data/ui/static /data/templates
 
         # Cleanup from older broken installs (a directory with the script name).
         if [ -d /data/templates/init-entrypoint.sh ]; then
@@ -75,7 +75,17 @@ services:
           envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
           chown -R 1000:1000 /data/pool
         else
+          needs_ckpool_regen=0
           if ! grep -q '"btcaddress"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if ! grep -q '"webdir"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if ! grep -q '"userdir"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if [ "$$needs_ckpool_regen" -eq 1 ]; then
             mv /data/pool/config/ckpool.conf "/data/pool/config/ckpool.conf.bak.$(date +%s 2>/dev/null || echo 0)" || true
             envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
             chown -R 1000:1000 /data/pool
