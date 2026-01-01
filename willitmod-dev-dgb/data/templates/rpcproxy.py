@@ -1,9 +1,7 @@
-import base64
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
+import http.client
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -69,35 +67,43 @@ class Handler(BaseHTTPRequestHandler):
 
         out_body = json.dumps(request_json).encode("utf-8")
 
-        req = urllib.request.Request(TARGET_RPC_URL, data=out_body, method="POST")
-        content_type = self.headers.get("Content-Type")
-        if content_type:
-            req.add_header("Content-Type", content_type)
-        req.add_header("Content-Length", str(len(out_body)))
-
+        content_type = self.headers.get("Content-Type") or "application/json"
         auth = self.headers.get("Authorization")
+
+        conn = http.client.HTTPConnection("dgbd", 14022, timeout=15)
+        headers = {
+            "Content-Type": content_type,
+            "Content-Length": str(len(out_body)),
+        }
         if auth:
-            req.add_header("Authorization", auth)
+            headers["Authorization"] = auth
 
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp_body = resp.read()
-                self.send_response(resp.status)
-                for key, value in resp.headers.items():
-                    if key.lower() in {"connection", "transfer-encoding"}:
-                        continue
-                    self.send_header(key, value)
-                self.end_headers()
-                self.wfile.write(resp_body)
-        except urllib.error.HTTPError as e:
-            resp_body = e.read()
-            self.send_response(e.code)
+            conn.request("POST", "/", body=out_body, headers=headers)
+            resp = conn.getresponse()
+            resp_body = resp.read()
+            self.send_response(resp.status)
+            for key, value in resp.getheaders():
+                if key.lower() in {"connection", "transfer-encoding"}:
+                    continue
+                self.send_header(key, value)
             self.end_headers()
-            self.wfile.write(resp_body)
+            try:
+                self.wfile.write(resp_body)
+            except BrokenPipeError:
+                return
         except Exception as e:
             self.send_response(502)
             self.end_headers()
-            self.wfile.write(str(e).encode("utf-8"))
+            try:
+                self.wfile.write(str(e).encode("utf-8"))
+            except BrokenPipeError:
+                return
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - - [%s] %s\n" % (self.client_address[0], self.log_date_time_string(), fmt % args))
@@ -111,4 +117,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

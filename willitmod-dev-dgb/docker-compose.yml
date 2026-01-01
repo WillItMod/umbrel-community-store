@@ -34,6 +34,11 @@ services:
           rm -rf /data/templates/init-entrypoint.sh || true
         fi
 
+        # Cleanup from older broken installs (a directory with the script name).
+        if [ -d /data/templates/rpcproxy.py ]; then
+          rm -rf /data/templates/rpcproxy.py || true
+        fi
+
         if [ ! -f /data/node/digibyte.conf ]; then
           envsubst < /data/templates/digibyte.conf.template > /data/node/digibyte.conf
           chown -R 1000:1000 /data/node
