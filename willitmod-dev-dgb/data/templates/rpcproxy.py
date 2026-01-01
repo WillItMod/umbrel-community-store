@@ -2,7 +2,7 @@ import json
 import os
 import sys
 import http.client
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 TARGET_RPC_URL = os.environ.get("TARGET_RPC_URL", "http://dgbd:14022/")
@@ -110,7 +110,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    httpd = HTTPServer((LISTEN_HOST, LISTEN_PORT), Handler)
+    httpd = ThreadingHTTPServer((LISTEN_HOST, LISTEN_PORT), Handler)
     sys.stderr.write(f"[rpcproxy] listening on {LISTEN_HOST}:{LISTEN_PORT}, forwarding to {TARGET_RPC_URL}, force_algo={FORCE_ALGO}\n")
     httpd.serve_forever()
 
