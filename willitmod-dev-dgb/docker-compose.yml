@@ -84,7 +84,12 @@ services:
       - ${APP_DATA_DIR}/data/templates/dgb-entrypoint.sh:/dgb-entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/dgb-entrypoint.sh"]
     healthcheck:
-      test: ["CMD-SHELL", "digibyte-cli -datadir=/data getblockchaininfo >/dev/null 2>&1"]
+      # Treat "warming up" states as healthy so Umbrel doesn't hide the UI while syncing.
+      test:
+        [
+          "CMD-SHELL",
+          "digibyte-cli -datadir=/data getblockchaininfo >/dev/null 2>&1 || digibyte-cli -datadir=/data getblockchaininfo 2>&1 | grep -qE 'Loading block index|Rewinding blocks|Verifying blocks|Loading wallet'",
+        ]
       interval: 30s
       timeout: 10s
       retries: 20
@@ -96,7 +101,8 @@ services:
     user: "1000:1000"
     depends_on:
       - dgbd
-    restart: on-failure
+    # ckpool can exit cleanly while the node is still warming up; keep restarting until ready.
+    restart: unless-stopped
     stop_grace_period: 30s
     ports:
       - "5678:3333/tcp"
@@ -109,9 +115,7 @@ services:
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
-    depends_on:
-      - dgbd
-      - ckpool
+    # Keep the UI up even if the node/pool is still starting.
     networks:
       default:
         aliases:
