@@ -9,7 +9,7 @@
   ],
   "btcaddress": "${PAYOUT_ADDRESS}",
   "btcsig": "/mined by WillItMod on Umbrel/",
-  "mindiff": 64,
+  "mindiff": 1024,
   "startdiff": 1024,
   "maxdiff": 0,
   "logdir": "/www",
