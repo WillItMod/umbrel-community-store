@@ -105,7 +105,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.7.26-alpha
+    image: ghcr.io/willitmod/axedgb-app:0.7.27-alpha
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
