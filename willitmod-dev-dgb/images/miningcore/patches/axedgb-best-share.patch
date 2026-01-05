@@ -1,0 +1,79 @@
+﻿diff --git a/src/Miningcore/Blockchain/Bitcoin/BitcoinJob.cs b/src/Miningcore/Blockchain/Bitcoin/BitcoinJob.cs
+index 38ea3701..907b5a22 100644
+--- a/src/Miningcore/Blockchain/Bitcoin/BitcoinJob.cs
++++ b/src/Miningcore/Blockchain/Bitcoin/BitcoinJob.cs
+@@ -355,6 +355,7 @@ public class BitcoinJob
+         {
+             BlockHeight = BlockTemplate.Height,
+             NetworkDifficulty = Difficulty,
++            ActualDifficulty = shareDiff / shareMultiplier,
+             Difficulty = stratumDifficulty / shareMultiplier,
+         };
+ 
+diff --git a/src/Miningcore/Blockchain/Share.cs b/src/Miningcore/Blockchain/Share.cs
+index 42af0d1f..98655c20 100644
+--- a/src/Miningcore/Blockchain/Share.cs
++++ b/src/Miningcore/Blockchain/Share.cs
+@@ -48,6 +48,13 @@ public class Share
+     [ProtoMember(8)]
+     public double Difficulty { get; set; }
+ 
++    /// <summary>
++    /// Actual share difficulty (derived from the share's hash), normalized to the same scale as <see cref="Difficulty"/>.
++    /// Useful for "best share" / "closest-to-block" style stats.
++    /// </summary>
++    [ProtoMember(17)]
++    public double? ActualDifficulty { get; set; }
++
+     /// <summary>
+     /// Block this share refers to
+     /// </summary>
+diff --git a/src/Miningcore/Persistence/Model/Share.cs b/src/Miningcore/Persistence/Model/Share.cs
+index a1ae7c97..4764a70d 100644
+--- a/src/Miningcore/Persistence/Model/Share.cs
++++ b/src/Miningcore/Persistence/Model/Share.cs
+@@ -8,6 +8,7 @@ public record Share
+     public string Worker { get; init; }
+     public string UserAgent { get; init; }
+     public double Difficulty { get; init; }
++    public double? ActualDifficulty { get; init; }
+     public double NetworkDifficulty { get; init; }
+     public string IpAddress { get; init; }
+     public string Source { get; init; }
+diff --git a/src/Miningcore/Persistence/Postgres/Entities/Share.cs b/src/Miningcore/Persistence/Postgres/Entities/Share.cs
+index 1527235b..71ed2b63 100644
+--- a/src/Miningcore/Persistence/Postgres/Entities/Share.cs
++++ b/src/Miningcore/Persistence/Postgres/Entities/Share.cs
+@@ -8,6 +8,7 @@ public class Share
+     public string Worker { get; set; }
+     public string UserAgent { get; set; }
+     public double Difficulty { get; set; }
++    public double? ActualDifficulty { get; set; }
+     public double NetworkDifficulty { get; set; }
+     public string IpAddress { get; set; }
+     public string Source { get; set; }
+diff --git a/src/Miningcore/Persistence/Postgres/Repositories/ShareRepository.cs b/src/Miningcore/Persistence/Postgres/Repositories/ShareRepository.cs
+index f06d6ed7..e21af50d 100644
+--- a/src/Miningcore/Persistence/Postgres/Repositories/ShareRepository.cs
++++ b/src/Miningcore/Persistence/Postgres/Repositories/ShareRepository.cs
+@@ -25,7 +25,7 @@ public class ShareRepository : IShareRepository
+ 
+         var pgCon = (NpgsqlConnection) con;
+ 
+-        const string query = @"COPY shares (poolid, blockheight, difficulty,
++        const string query = @"COPY shares (poolid, blockheight, difficulty, actualdifficulty,
+             networkdifficulty, miner, worker, useragent, ipaddress, source, created) FROM STDIN (FORMAT BINARY)";
+ 
+         await using(var writer = await pgCon.BeginBinaryImportAsync(query, ct))
+@@ -37,6 +37,10 @@ public class ShareRepository : IShareRepository
+                 await writer.WriteAsync(share.PoolId, ct);
+                 await writer.WriteAsync((long) share.BlockHeight, NpgsqlDbType.Bigint, ct);
+                 await writer.WriteAsync(share.Difficulty, NpgsqlDbType.Double, ct);
++                if(share.ActualDifficulty.HasValue)
++                    await writer.WriteAsync(share.ActualDifficulty.Value, NpgsqlDbType.Double, ct);
++                else
++                    await writer.WriteNullAsync(ct);
+                 await writer.WriteAsync(share.NetworkDifficulty, NpgsqlDbType.Double, ct);
+                 await writer.WriteAsync(share.Miner, ct);
+                 await writer.WriteAsync(share.Worker, ct);
+

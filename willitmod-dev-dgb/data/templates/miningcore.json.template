@@ -1,0 +1,122 @@
+{
+  "logging": {
+    "level": "info",
+    "enableConsoleLog": true,
+    "enableConsoleColors": true,
+    "logFile": "",
+    "logBaseDirectory": "",
+    "perPoolLogFile": false
+  },
+  "banning": {
+    "banOnJunkReceive": true,
+    "banOnInvalidShares": false,
+    "banOnLoginFailure": false
+  },
+  "notifications": {
+    "enabled": false
+  },
+  "api": {
+    "enabled": true,
+    "listenAddress": "0.0.0.0",
+    "port": 4000,
+    "adminPort": 4010,
+    "metricsPort": 4020,
+    "adminIpWhitelist": ["127.0.0.1", "::1"],
+    "metricsIpWhitelist": ["127.0.0.1", "::1"]
+  },
+  "persistence": {
+    "postgres": {
+      "host": "${DB_HOST}",
+      "port": 5432,
+      "user": "${DB_USER}",
+      "password": "${DB_PASSWORD}",
+      "database": "${DB_NAME}"
+    }
+  },
+  "paymentProcessing": {
+    "enabled": false,
+    "interval": 600,
+    "shareRecoveryFile": "recovered-shares.txt"
+  },
+  "pools": [
+    {
+      "id": "dgb-sha256-1",
+      "enabled": true,
+      "coin": "digibyte-sha256",
+      "address": "D596YFweJQuHY1BbjazZYmAbt8jJPbKehC",
+      "blockRefreshInterval": 500,
+      "jobRebroadcastTimeout": 10,
+      "clientConnectionTimeout": 600,
+      "paymentProcessing": {
+        "enabled": false
+      },
+      "banning": {
+        "enabled": true,
+        "time": 600,
+        "invalidPercent": 50,
+        "checkThreshold": 50
+      },
+      "ports": {
+        "3333": {
+          "listenAddress": "127.0.0.1",
+          "difficulty": ${SHA256_STARTDIFF},
+          "varDiff": {
+            "minDiff": ${SHA256_MINDIFF},
+            "maxDiff": ${SHA256_MAXDIFF_JSON},
+            "targetTime": 7,
+            "retargetTime": 15,
+            "variancePercent": 20
+          }
+        }
+      },
+      "daemons": [
+        {
+          "host": "dgbd",
+          "port": ${DGB_RPC_PORT},
+          "user": "${RPC_USER}",
+          "password": "${RPC_PASSWORD}"
+        }
+      ]
+    },
+    {
+      "id": "dgb-scrypt-1",
+      "enabled": true,
+      "coin": "digibyte-scrypt",
+      "address": "D596YFweJQuHY1BbjazZYmAbt8jJPbKehC",
+      "blockRefreshInterval": 500,
+      "jobRebroadcastTimeout": 10,
+      "clientConnectionTimeout": 600,
+      "paymentProcessing": {
+        "enabled": false
+      },
+      "banning": {
+        "enabled": true,
+        "time": 600,
+        "invalidPercent": 50,
+        "checkThreshold": 50
+      },
+      "ports": {
+        "3334": {
+          "listenAddress": "127.0.0.1",
+          "difficulty": ${SCRYPT_STARTDIFF},
+          "varDiff": {
+            "minDiff": ${SCRYPT_MINDIFF},
+            "maxDiff": ${SCRYPT_MAXDIFF_JSON},
+            "targetTime": 15,
+            "retargetTime": 90,
+            "variancePercent": 30
+          }
+        }
+      },
+      "daemons": [
+        {
+          "host": "dgbd",
+          "port": ${DGB_RPC_PORT},
+          "user": "${RPC_USER}",
+          "password": "${RPC_PASSWORD}"
+        }
+      ]
+    }
+  ]
+}
+

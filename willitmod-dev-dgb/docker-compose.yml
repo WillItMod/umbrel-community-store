@@ -1,0 +1,517 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      # Use a unique DNS alias to avoid collisions on Umbrel's shared Docker network.
+      APP_HOST: axedgb-app
+      APP_PORT: 3000
+      # Verify Umbrel auth tokens using the same secret the auth-server uses.
+      # Umbrel's auth-server signs tokens with JWT_SECRET.
+      # When starting/restarting via Umbrel, exports.sh should populate JWT_SECRET.
+      JWT_SECRET: "${JWT_SECRET}"
+    networks:
+      - umbrel_main_network
+
+  init:
+    image: alpine:3.22.1
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}:/appdata
+    environment:
+      APPS_SUBNET: "${NETWORK_IP}/16"
+      RPC_USER: "dgb"
+      RPC_PASSWORD: "${APP_PASSWORD}"
+      DGB_P2P_PORT: "12024"
+      DGB_RPC_PORT: "14022"
+      DGB_ZMQ_HASHBLOCK_PORT: "28344"
+      # Miningcore requires a syntactically valid payout address to start.
+      # This is a deterministic placeholder ("burn") address; the pool binds Stratum to localhost until the user sets a real payout address in Settings.
+      DB_HOST: "postgres"
+      DB_USER: "miningcore"
+      DB_PASSWORD: "${APP_PASSWORD}"
+      DB_NAME: "miningcore"
+      # Default VarDiff profile for DGB SHA256: Mixed (protect small miners, still works for larger rigs)
+      # Min / Start / Max
+      SHA256_MINDIFF: "128"
+      SHA256_STARTDIFF: "512"
+      SHA256_MAXDIFF_JSON: "8192"
+
+      # Conservative Scrypt defaults (leave room for low-hashrate miners)
+      # Min / Start / Max
+      SCRYPT_MINDIFF: "1"
+      SCRYPT_STARTDIFF: "1"
+      SCRYPT_MAXDIFF_JSON: "128"
+    command:
+      - /bin/sh
+      - -ec
+      - |-
+        set -eu
+
+        apk add --no-cache envsubst curl jq postgresql-client >/dev/null
+
+        # Persist Umbrel's JWT secret into ${APP_DATA_DIR}/.env so that SSH restarts
+        # (without Umbrel's exports.sh) don't boot app_proxy with an empty JWT_SECRET.
+        if [ -n "${JWT_SECRET:-}" ]; then
+          envfile="/appdata/.env"
+          tmp="/appdata/.env.tmp"
+          if [ -f "$$envfile" ]; then
+            grep -v '^JWT_SECRET=' "$$envfile" > "$$tmp" || true
+          else
+            : > "$$tmp"
+          fi
+          printf "JWT_SECRET=%s\n" "${JWT_SECRET}" >> "$$tmp"
+          chmod 600 "$$tmp" || true
+          chown 1000:1000 "$$tmp" || true
+          mv "$$tmp" "$$envfile"
+        fi
+
+        mkdir -p /data/node /data/pool/config /data/pool/postgres /data/templates
+
+        # Cleanup from older broken installs (a directory with the script name).
+        if [ -d /data/templates/init-entrypoint.sh ]; then
+          rm -rf /data/templates/init-entrypoint.sh || true
+        fi
+
+        if [ ! -f /data/node/digibyte.conf ]; then
+          envsubst < /data/templates/digibyte.conf.template > /data/node/digibyte.conf
+          chown -R 1000:1000 /data/node
+        else
+          if ! grep -q '^maxconnections=' /data/node/digibyte.conf; then
+            echo "[axedgb] Adding maxconnections=64 to digibyte.conf"
+            {
+              printf "\n"
+              printf "# AxeDGB defaults\n"
+              printf "maxconnections=64\n"
+            } >> /data/node/digibyte.conf
+          fi
+          if ! grep -q '^upnp=' /data/node/digibyte.conf; then
+            echo "[axedgb] Adding upnp=1 to digibyte.conf"
+            {
+              printf "\n"
+              printf "# AxeDGB defaults\n"
+              printf "upnp=1\n"
+            } >> /data/node/digibyte.conf
+          fi
+          if ! awk 'BEGIN{inTest=0; found=0} /^\\[test\\][[:space:]]*$/{inTest=1} /axedgb-rpc-defaults-v2/{if(!inTest) found=1} END{exit(found?0:1)}' /data/node/digibyte.conf; then
+            echo "[axedgb] Adding RPC capacity defaults to digibyte.conf"
+            if grep -q '^\\[test\\][[:space:]]*$' /data/node/digibyte.conf; then
+              awk 'BEGIN{added=0}
+                /^\\[test\\][[:space:]]*$/{if(!added){
+                  print "";
+                  print "# axedgb-rpc-defaults-v2";
+                  print "# AxeDGB defaults (Miningcore + UI increase RPC load)";
+                  print "rpcworkqueue=1024";
+                  print "rpcthreads=32";
+                  added=1
+                }}
+                {print}
+              ' /data/node/digibyte.conf > /data/node/digibyte.conf.tmp && mv /data/node/digibyte.conf.tmp /data/node/digibyte.conf
+            else
+              {
+                printf "\n"
+                printf "# axedgb-rpc-defaults-v2\n"
+                printf "# AxeDGB defaults (Miningcore + UI increase RPC load)\n"
+                printf "rpcworkqueue=1024\n"
+                printf "rpcthreads=32\n"
+              } >> /data/node/digibyte.conf
+            fi
+          fi
+          if ! grep -q 'axedgb-seeds-v1' /data/node/digibyte.conf; then
+            echo "[axedgb] Adding bootstrap peers to digibyte.conf"
+            {
+              printf "\n"
+              printf "# AxeDGB bootstrap peers (helps early IBD if DNS seeds are flaky)\n"
+              printf "# axedgb-seeds-v1\n"
+              printf "addnode=5.189.152.60:12024\n"
+              printf "addnode=24.97.94.219:12024\n"
+              printf "addnode=45.76.249.217:12024\n"
+              printf "addnode=47.93.161.68:12024\n"
+              printf "addnode=52.45.88.37:12024\n"
+              printf "addnode=60.12.123.42:12024\n"
+              printf "addnode=66.108.15.5:12024\n"
+              printf "addnode=73.156.140.158:12024\n"
+              printf "addnode=144.76.103.24:12024\n"
+              printf "addnode=184.164.16.141:12024\n"
+            } >> /data/node/digibyte.conf
+          fi
+
+          # Ensure testnet section exists so switching to testnet doesn't end up with 0 peers.
+          conf="/data/node/digibyte.conf"
+
+          # Deduplicate accidental repeated [test] blocks from older versions.
+          # (DigiByte logs each config arg occurrence, so duplicates look like "reindexing" noise on startup.)
+          if [ -f "$$conf" ] && grep -q '^[[]test[]]' "$$conf"; then
+            awk '
+              BEGIN{seen_test=0; drop=0}
+              /^[[][^]]+[]][[:space:]]*$/{
+                if ($0=="[test]") {
+                  if (seen_test==0) { seen_test=1; drop=0; print; next }
+                  drop=1; next
+                }
+                drop=0; print; next
+              }
+              { if (drop==0) print }
+            ' "$$conf" > "$$conf.tmp" && mv "$$conf.tmp" "$$conf"
+          fi
+
+          if [ -f "$$conf" ] && ! grep -q '^[[]test[]]' "$$conf"; then
+            echo "[axedgb] Adding [test] section defaults to digibyte.conf"
+            {
+              printf "\n"
+              printf "# Testnet settings\n"
+              printf "[test]\n"
+              printf "port=12026\n"
+              printf "rpcport=14023\n"
+              printf "rpcbind=0.0.0.0\n"
+              printf "zmqpubhashblock=tcp://0.0.0.0:$$DGB_ZMQ_HASHBLOCK_PORT\n"
+              printf "addnode=testnet-seed.digibyte.org:12026\n"
+              printf "addnode=95.179.160.53:12026\n"
+              printf "addnode=51.15.113.125:12026\n"
+            } >> "$$conf"
+          fi
+        fi
+
+        if [ ! -f /data/pool/config/miningcore.json ]; then
+          envsubst < /data/templates/miningcore.json.template > /data/pool/config/miningcore.json
+          chown -R 1000:1000 /data/pool/config || true
+        else
+          # Normalize config across upgrades (some Miningcore builds don't accept banning.manager,
+          # and Miningcore currently assumes notifications exists).
+          if command -v jq >/dev/null 2>&1 && jq -e '.' >/dev/null 2>&1 < /data/pool/config/miningcore.json; then
+            tmp="/data/pool/config/miningcore.json.tmp"
+            jq --argjson rpcport "$$DGB_RPC_PORT" '
+              .notifications = (.notifications // {"enabled": false})
+              | (.banning |= (if type=="object" then del(.manager) else . end))
+              | (.pools |= (if type=="array" then map(
+                  if type=="object" then
+                    (.paymentProcessing = (.paymentProcessing // {"enabled": false}))
+                    | (.blockRefreshInterval = ((.blockRefreshInterval // 500) | if . < 2000 then 2000 else . end))
+                    | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="0.0.0.0") else . end)) else . end))
+                    | (if .id=="dgb-sha256-1" then
+                        (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then
+                          (.varDiff.targetTime = 7)
+                          | (.varDiff.retargetTime = 15)
+                          | (.varDiff.variancePercent = 20)
+                        else . end)) else . end))
+                      else . end)
+                    | (.daemons = ((.daemons // []) | (if type=="array" then map(if type=="object" then (.port=$rpcport) else . end) else . end)))
+                  else . end
+                ) else . end))
+            ' /data/pool/config/miningcore.json > "$$tmp" && mv "$$tmp" /data/pool/config/miningcore.json
+
+            # Ensure the Scrypt pool exists when upgrading from SHA256-only configs.
+            if ! jq -e '.pools[]? | select(.id=="dgb-scrypt-1")' /data/pool/config/miningcore.json >/dev/null 2>&1; then
+              echo "[axedgb] Adding dgb-scrypt-1 Miningcore pool"
+              base_addr="$(jq -r '.pools[]? | select(.id=="dgb-sha256-1") | .address // empty' /data/pool/config/miningcore.json | head -n 1)"
+              base_enabled="true"
+              if [ -z "$$base_addr" ]; then base_enabled="false"; fi
+              base_diff="$${SCRYPT_STARTDIFF:-1}"
+              base_mindiff="$${SCRYPT_MINDIFF:-1}"
+              base_maxdiff_json="$${SCRYPT_MAXDIFF_JSON:-128}"
+              daemons_json="$(jq -c '.pools[]? | select(.id=="dgb-sha256-1") | (.daemons // [])' /data/pool/config/miningcore.json | head -n 1)"
+              if [ -z "$$daemons_json" ]; then daemons_json='[]'; fi
+              if [ -z "$$base_maxdiff_json" ]; then base_maxdiff_json='null'; fi
+
+              tmp2="/data/pool/config/miningcore.json.tmp2"
+              jq --arg addr "$$base_addr" \
+                 --argjson enabled "$$base_enabled" \
+                 --argjson diff "$$base_diff" \
+                 --argjson mindiff "$$base_mindiff" \
+                 --argjson maxdiff "$$base_maxdiff_json" \
+                 --argjson daemons "$$daemons_json" \
+                 '
+                 .pools = (.pools // []) + [{
+                   "id": "dgb-scrypt-1",
+                   "enabled": $$enabled,
+                   "coin": "digibyte-scrypt",
+                   "address": $$addr,
+                   "blockRefreshInterval": 500,
+                   "jobRebroadcastTimeout": 10,
+                   "clientConnectionTimeout": 600,
+                   "paymentProcessing": {"enabled": false},
+                   "banning": {"enabled": true, "time": 600, "invalidPercent": 50, "checkThreshold": 50},
+                   "ports": {
+                     "3334": {
+                       "listenAddress": "0.0.0.0",
+                       "difficulty": $$diff,
+                       "varDiff": {
+                         "minDiff": $$mindiff,
+                         "maxDiff": $$maxdiff,
+                         "targetTime": 15,
+                         "retargetTime": 90,
+                         "variancePercent": 30
+                       }
+                     }
+                   },
+                   "daemons": $$daemons
+                 }]
+                 ' /data/pool/config/miningcore.json > "$$tmp2" && mv "$$tmp2" /data/pool/config/miningcore.json
+            fi
+
+            # Apply user-saved payout address + varDiff settings (saved by the UI into a state file).
+            # This ensures the payout address applies to BOTH pools (SHA256 + Scrypt) and survives upgrades.
+            settings="/data/ui/state/pool_settings.json"
+            if [ -f "$$settings" ] && jq -e '.' >/dev/null 2>&1 < "$$settings"; then
+              desired_addr="$(jq -r '.payoutAddress // empty' "$$settings" | tr -d ' \t\r\n')"
+              desired_mindiff="$(jq -r '.mindiff // empty' "$$settings" | tr -d ' \t\r\n')"
+              desired_startdiff="$(jq -r '.startdiff // empty' "$$settings" | tr -d ' \t\r\n')"
+              desired_maxdiff="$(jq -r '.maxdiff // empty' "$$settings" | tr -d ' \t\r\n')"
+
+              if ! echo "$$desired_mindiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_mindiff=""; fi
+              if ! echo "$$desired_startdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_startdiff=""; fi
+              if ! echo "$$desired_maxdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_maxdiff=""; fi
+
+              # Only accept legacy/base58 payout addresses here. Bech32 (dgb1...) will be rejected by Miningcore.
+              if echo "$$desired_addr" | grep -qE '^[DS][1-9A-HJ-NP-Za-km-z]{25,60}$$'; then
+                echo "[axedgb] Applying payout address + varDiff settings from $$settings"
+                tmp_apply="/data/pool/config/miningcore.json.tmp_apply"
+                jq --arg addr "$$desired_addr" \
+                   --argjson mindiff "$${desired_mindiff:-0}" \
+                   --argjson startdiff "$${desired_startdiff:-0}" \
+                   --argjson maxdiff "$${desired_maxdiff:-0}" \
+                   '
+                   def apply_port(p):
+                     p
+                     | .listenAddress = "0.0.0.0"
+                     | (if ($$startdiff > 0) then .difficulty = $$startdiff else . end)
+                     | (if ($$mindiff > 0) then .varDiff.minDiff = $$mindiff else . end)
+                     | (if ($$maxdiff > 0) then .varDiff.maxDiff = $$maxdiff else .varDiff.maxDiff = null end)
+                     | (.varDiff.targetTime = 7)
+                     | (.varDiff.retargetTime = 15)
+                     | (.varDiff.variancePercent = 20);
+
+                   (.pools |= (if type=="array" then map(
+                     if (.id=="dgb-sha256-1") then
+                       (.enabled = true)
+                       | (.address = $$addr)
+                       | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then apply_port(.) else . end)) else . end))
+                     elif (.id=="dgb-scrypt-1") then
+                       (.enabled = true)
+                       | (.address = $$addr)
+                     else . end
+                   ) else . end))
+                   ' /data/pool/config/miningcore.json > "$$tmp_apply" && mv "$$tmp_apply" /data/pool/config/miningcore.json
+              fi
+            fi
+
+            # Safety:
+            # - Miningcore crashes on DigiByte bech32 (dgb1...) pool addresses.
+            # - We keep a placeholder address to allow Miningcore to start, but Stratum must not be exposed until the user sets a real payout address.
+            #
+            # If address is bech32, empty, or placeholder: force placeholder and bind Stratum to localhost.
+            if jq -r '.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") | (.address // "")' /data/pool/config/miningcore.json | grep -qiE '^(dgb1|)$|^D596YFweJQuHY1BbjazZYmAbt8jJPbKehC$'; then
+              echo "[axedgb] Payout address not configured (or unsupported); binding Stratum to localhost until a real legacy address is set"
+              tmp3="/data/pool/config/miningcore.json.tmp3"
+              jq '
+                (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
+                  | .enabled=true
+                  | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
+                  | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
+                ) | .
+              ' /data/pool/config/miningcore.json > "$$tmp3" && mv "$$tmp3" /data/pool/config/miningcore.json
+            fi
+          fi
+        fi
+
+        # Ensure Miningcore has a coins.json available at runtime.
+        # Our Miningcore container expects this file next to the binary; without it, the API can crash on startup.
+        if [ ! -f /data/pool/config/coins.json ]; then
+          cat > /data/pool/config/coins.json <<'EOF'
+        {
+          "digibyte-sha256": {
+            "name": "Digibyte Sha256",
+            "canonicalName": "Digibyte",
+            "symbol": "DGB",
+            "family": "bitcoin",
+            "website": "https://digibyte.org/",
+            "market": "https://coinmarketcap.com/currencies/digibyte/",
+            "twitter": "https://twitter.com/digibytecoin",
+            "telegram": "https://t.me/DigiByteCoin",
+            "discord": "",
+            "coinbaseHasher": { "hash": "sha256d" },
+            "headerHasher": { "hash": "sha256d" },
+            "blockHasher": { "hash": "reverse", "args": [ { "hash": "sha256d" } ] },
+            "blockTemplateRpcExtraParams": ["sha256d"],
+            "explorerBlockLink": "https://chainz.cryptoid.info/dgb/block.dws?$$height$$.htm",
+            "explorerTxLink": "https://chainz.cryptoid.info/dgb/tx.dws?{0}.htm",
+            "explorerAccountLink": "https://chainz.cryptoid.info/dgb/address.dws?{0}.htm"
+          },
+          "digibyte-scrypt": {
+            "name": "Digibyte Scrypt",
+            "canonicalName": "Digibyte",
+            "symbol": "DGB",
+            "family": "bitcoin",
+            "website": "https://digibyte.org/",
+            "market": "https://coinmarketcap.com/currencies/digibyte/",
+            "twitter": "https://twitter.com/digibytecoin",
+            "telegram": "https://t.me/DigiByteCoin",
+            "discord": "",
+            "coinbaseHasher": { "hash": "sha256d" },
+            "headerHasher": { "hash": "scrypt", "args": [1024, 1] },
+            "blockHasher": { "hash": "reverse", "args": [ { "hash": "sha256d" } ] },
+            "shareMultiplier": 65536,
+            "blockTemplateRpcExtraParams": ["scrypt"],
+            "explorerBlockLink": "https://chainz.cryptoid.info/dgb/block.dws?$$height$$.htm",
+            "explorerTxLink": "https://chainz.cryptoid.info/dgb/tx.dws?{0}.htm",
+            "explorerAccountLink": "https://chainz.cryptoid.info/dgb/address.dws?{0}.htm"
+          }
+        }
+        EOF
+          chown 1000:1000 /data/pool/config/coins.json || true
+        fi
+
+        # Ensure Miningcore DB schema exists (poolstats etc). This is safe to re-run when missing.
+        export PGPASSWORD="$$DB_PASSWORD"
+        echo "[axedgb] Waiting for postgres..."
+        for i in $(seq 1 60); do
+          if pg_isready -h "$$DB_HOST" -p 5432 -U "$$DB_USER" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 1
+        done
+
+        if ! psql -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -tA -c "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='poolstats';" 2>/dev/null | grep -q '^1$'; then
+          echo "[axedgb] Initializing Miningcore database schema"
+          if [ ! -f /data/templates/miningcore-createdb.sql ]; then
+            echo "[axedgb] miningcore-createdb.sql missing; writing built-in schema"
+            mkdir -p /data/templates
+            {
+              printf '%s\n' 'SET statement_timeout = 0;'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE shares (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, blockheight BIGINT NOT NULL, difficulty DOUBLE PRECISION NOT NULL, actualdifficulty DOUBLE PRECISION, networkdifficulty DOUBLE PRECISION NOT NULL, miner TEXT NOT NULL, worker TEXT, useragent TEXT, ipaddress TEXT, source TEXT, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_shares_poolid_created ON shares(poolid, created);'
+              printf '%s\n' 'CREATE INDEX IX_shares_poolid_miner_created ON shares(poolid, miner, created);'
+              printf '%s\n' 'CREATE INDEX IX_shares_poolid_miner_worker_created ON shares(poolid, miner, worker, created);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE blocks (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, blockheight BIGINT NOT NULL, networkdifficulty DOUBLE PRECISION NOT NULL, status INT NOT NULL, type INT NOT NULL, transactionconfirmationdata TEXT, miner TEXT NOT NULL, worker TEXT, effort DOUBLE PRECISION NOT NULL, rewardamount DOUBLE PRECISION NOT NULL, info TEXT, hash TEXT NOT NULL, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_blocks_poolid_created ON blocks(poolid, created);'
+              printf '%s\n' 'CREATE INDEX IX_blocks_poolid_height ON blocks(poolid, blockheight);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE balances (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, address TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_balances_poolid_address ON balances(poolid, address);'
+              printf '%s\n' 'CREATE INDEX IX_balances_poolid_created ON balances(poolid, created);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE balance_changes (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, address TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, usage TEXT, tags TEXT, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_balance_changes_poolid_created ON balance_changes(poolid, created);'
+              printf '%s\n' 'CREATE INDEX IX_balance_changes_poolid_address_created ON balance_changes(poolid, address, created);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE miner_settings (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, address TEXT NOT NULL, paymentthreshold DOUBLE PRECISION NOT NULL, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_miner_settings_poolid_address ON miner_settings(poolid, address);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE payments (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, coin TEXT NOT NULL, address TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, transactionconfirmationdata TEXT, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_payments_poolid_created ON payments(poolid, created);'
+              printf '%s\n' 'CREATE INDEX IX_payments_poolid_address_created ON payments(poolid, address, created);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE poolstats (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, connectedminers INT NOT NULL, poolhashrate DOUBLE PRECISION NOT NULL, networkhashrate DOUBLE PRECISION NOT NULL, networkdifficulty DOUBLE PRECISION NOT NULL, lastnetworkblocktime TIMESTAMP, blockheight BIGINT NOT NULL, connectedpeers INT NOT NULL, sharespersecond INT NOT NULL, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_poolstats_poolid_created ON poolstats(poolid, created);'
+              printf '\n'
+              printf '%s\n' 'CREATE TABLE minerstats (id BIGSERIAL PRIMARY KEY NOT NULL, poolid TEXT NOT NULL, miner TEXT NOT NULL, hashrate DOUBLE PRECISION NOT NULL, sharespersecond INT NOT NULL, created TIMESTAMP NOT NULL);'
+              printf '%s\n' 'CREATE INDEX IX_minerstats_poolid_created ON minerstats(poolid, created);'
+              printf '%s\n' 'CREATE INDEX IX_minerstats_poolid_miner_created ON minerstats(poolid, miner, created);'
+              printf '\n'
+            } > /data/templates/miningcore-createdb.sql
+          fi
+          psql -v ON_ERROR_STOP=1 -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" < /data/templates/miningcore-createdb.sql >/dev/null
+        fi
+
+        # Add new columns when upgrading (safe to re-run).
+        if ! psql -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -tA -c "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='shares' AND column_name='actualdifficulty';" 2>/dev/null | grep -q '^1$'; then
+          echo "[axedgb] Migrating DB: adding shares.actualdifficulty"
+          psql -v ON_ERROR_STOP=1 -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -c "ALTER TABLE shares ADD COLUMN actualdifficulty DOUBLE PRECISION;" >/dev/null
+        fi
+
+        # Seed an initial poolstats row so Miningcore's API does not error before the first stats tick.
+        if psql -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -tA -c "SELECT COUNT(*) FROM poolstats WHERE poolid='dgb-sha256-1';" 2>/dev/null | grep -q '^0$'; then
+          echo "[axedgb] Seeding initial poolstats row"
+          psql -v ON_ERROR_STOP=1 -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -c "INSERT INTO poolstats (poolid, connectedminers, poolhashrate, networkhashrate, networkdifficulty, lastnetworkblocktime, blockheight, connectedpeers, sharespersecond, created) VALUES ('dgb-sha256-1', 0, 0, 0, 0, NULL, 0, 0, 0, NOW());" >/dev/null
+        fi
+
+  dgbd:
+    image: ghcr.io/willitmod/digibyte:8.22.2
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 15m30s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "12024:12024/tcp" # P2P
+      - "12026:12026/tcp" # P2P (testnet)
+    volumes:
+      - ${APP_DATA_DIR}/data/node:/data
+      - ${APP_DATA_DIR}/data/templates/dgb-entrypoint.sh:/dgb-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/dgb-entrypoint.sh"]
+    healthcheck:
+      # Treat "warming up" states as healthy so Umbrel doesn't hide the UI while syncing.
+      test:
+        [
+          "CMD-SHELL",
+          "digibyte-cli -datadir=/data getblockchaininfo >/dev/null 2>&1 || digibyte-cli -datadir=/data getblockchaininfo 2>&1 | grep -qE 'Loading block index|Rewinding blocks|Verifying blocks|Loading wallet'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 2m
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    shm_size: "256mb"
+    environment:
+      POSTGRES_USER: "miningcore"
+      POSTGRES_PASSWORD: "${APP_PASSWORD}"
+      POSTGRES_DB: "miningcore"
+    volumes:
+      - ${APP_DATA_DIR}/data/pool/postgres:/var/lib/postgresql/data
+
+  miningcore:
+    image: ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r22
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - dgbd
+      - init
+    stop_grace_period: 30s
+    ports:
+      - "5678:3333/tcp" # Stratum v1 (SHA256)
+      - "5679:3334/tcp" # Stratum v1 (Scrypt)
+    volumes:
+      - ${APP_DATA_DIR}/data/pool/config/miningcore.json:/app/config.json:ro
+      - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
+
+  app:
+    image: ghcr.io/willitmod/axedgb-app-umbrel-dev:0.8.83
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 30s
+    # Keep the UI up even if the node/pool is still starting.
+    networks:
+      default:
+        aliases:
+          - axedgb-app
+      umbrel_main_network:
+        aliases:
+          - axedgb-app
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    environment:
+      DGB_RPC_HOST: "dgbd"
+      DGB_RPC_PORT: "14022"
+      DGB_RPC_USER: "dgb"
+      DGB_RPC_PASS: "${APP_PASSWORD}"
+      MININGCORE_API_URL: "http://miningcore:4000"
+      MININGCORE_POOL_ID: "dgb-sha256-1"
+      MININGCORE_POOL_IDS: "sha256:dgb-sha256-1,scrypt:dgb-scrypt-1"
+      STRATUM_PORTS: "sha256:5678,scrypt:5679"
+      MININGCORE_CONF_PATH: "/data/pool/config/miningcore.json"
+      APP_CHANNEL: "ALPHA"
+      DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.22.2"
+      MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r22"
+      POSTGRES_IMAGE: "postgres:16-alpine"
+      STATIC_DIR: "/app/static"
+
+networks:
+  umbrel_main_network:
+    external: true
+    name: umbrel_main_network
