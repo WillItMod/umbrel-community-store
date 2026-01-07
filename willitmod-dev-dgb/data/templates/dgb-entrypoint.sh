@@ -16,6 +16,21 @@ if [ -f /data/.reindex-chainstate ]; then
 fi
 
 dbcache="${DGB_DBCACHE_MB:-}"
+if [ -z "$dbcache" ] && [ -f /data/.dbcache_mb ]; then
+  raw="$(cat /data/.dbcache_mb 2>/dev/null | tr -d ' \t\r\n' || true)"
+  case "$raw" in
+    ""|auto|AUTO)
+      dbcache=""
+      ;;
+    *[!0-9]*)
+      echo "[axedgb] WARNING: invalid /data/.dbcache_mb value, ignoring"
+      dbcache=""
+      ;;
+    *)
+      dbcache="$raw"
+      ;;
+  esac
+fi
 if [ -z "$dbcache" ] && [ -r /proc/meminfo ]; then
   mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)"
   if [ -n "$mem_kb" ]; then
