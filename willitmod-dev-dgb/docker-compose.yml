@@ -172,8 +172,31 @@ services:
           fi
         fi
 
-        if [ ! -f /data/pool/config/miningcore.json ]; then
-          envsubst < /data/templates/miningcore.json.template > /data/pool/config/miningcore.json
+        miningcore_conf="/data/pool/config/miningcore.json"
+        miningcore_tpl="/data/templates/miningcore.json.template"
+
+        regen_mc="0"
+        if [ ! -f "$$miningcore_conf" ]; then
+          regen_mc="1"
+        elif command -v jq >/dev/null 2>&1; then
+          # Self-heal older/broken installs:
+          # - Some legacy versions wrote a pool-only JSON (missing top-level api/persistence/logging keys).
+          # - Interrupted writes can leave a malformed schema that Miningcore refuses to start with.
+          if ! jq -e '
+            type=="object"
+            and (.pools | type=="array")
+            and (.api | type=="object")
+            and (.persistence.postgres | type=="object")
+          ' "$$miningcore_conf" >/dev/null 2>&1; then
+            echo "[axedgb] miningcore.json schema invalid; regenerating from template"
+            regen_mc="1"
+            ts="$$(date +%s)"
+            mv "$$miningcore_conf" "$$miningcore_conf.bak.$$ts" 2>/dev/null || true
+          fi
+        fi
+
+        if [ "$$regen_mc" = "1" ]; then
+          envsubst < "$$miningcore_tpl" > "$$miningcore_conf"
           chown -R 1000:1000 /data/pool/config || true
         else
           # Normalize config across upgrades (some Miningcore builds don't accept banning.manager,
@@ -481,7 +504,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.8.97
+    image: ghcr.io/willitmod/axedgb-app:0.8.99
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
