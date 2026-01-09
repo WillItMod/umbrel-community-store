@@ -1,0 +1,21 @@
+server=1
+txindex=0
+
+# Pruning: keep ~30GB of recent blocks (recommended for mining nodes).
+prune=30000
+
+# Allow more peers (helps initial sync + network robustness).
+maxconnections=256
+
+# Mainnet only (Fractal Bitcoin).
+
+# RPC (internal apps only)
+rpcport=${FB_RPC_PORT}
+rpcuser=${FB_RPC_USER}
+rpcpassword=${FB_RPC_PASSWORD}
+rpcbind=0.0.0.0
+rpcallowip=127.0.0.1/32
+rpcallowip=${APPS_SUBNET}
+rpcallowip=10.0.0.0/8
+rpcallowip=172.16.0.0/12
+rpcallowip=192.168.0.0/16

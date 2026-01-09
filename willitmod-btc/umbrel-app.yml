@@ -1,0 +1,76 @@
+manifestVersion: 1
+id: willitmod-btc
+category: bitcoin
+name: AxeBTCF
+version: "0.7.9-alpha"
+tagline: BTC node + solo pool + AxePoW
+description: >-
+  Run a Bitcoin (BTC) full node (Bitcoin Core) and a solo Stratum v1 pool (ckpool) as a single Umbrel app installation.
+
+
+  Optional: enable AxePoW mode for Fractal Bitcoin merged mining (Bitcoin AuxPoW). Disabled by default.
+
+
+  Miner connection:
+    - URL: `stratum+tcp://<your-umbrel-ip>:7890`
+    - Username: worker name (optional)
+    - Password: anything
+
+
+  Notes:
+    - Set your payout address in the app Settings tab.
+    - BTC payout addresses support bech32 (`bc1...`) and legacy (`1...` / `3...`). Bitcoin Cash CashAddr (`q...` / `p...`) is not supported.
+developer: WillItMod
+website: https://github.com/WillItMod/umbrel-community-store
+repo: https://github.com/WillItMod/umbrel-community-store
+support: https://github.com/WillItMod/umbrel-community-store/issues
+dependencies: []
+port: 21215
+icon: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/icon.png"
+gallery:
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/icon.png"
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/1.png"
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/2.png"
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/3.png"
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/4.png"
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+widgets:
+  - id: "sync"
+    type: "text-with-progress"
+    refresh: "5s"
+    endpoint: "axebtc-app:3000/api/widget/sync"
+    link: ""
+    example:
+      type: "text-with-progress"
+      link: ""
+      title: "BTC sync"
+      text: "83%"
+      progressLabel: "In progress"
+      progress: 0.83
+  - id: "pool"
+    type: "three-stats"
+    refresh: "30s"
+    endpoint: "axebtc-app:3000/api/widget/pool"
+    link: ""
+    example:
+      type: "three-stats"
+      link: ""
+      items:
+        - title: "Hashrate"
+          text: "1.2"
+          subtext: "TH/s"
+        - title: "Workers"
+          text: "2"
+        - title: "Best Share"
+          text: "21"
+          subtext: "G"
+backupIgnore:
+  - data/node/blocks
+  - data/node/chainstate
+  - data/node/indexes
+  - data/fractal/blocks
+  - data/fractal/chainstate
+  - data/fractal/indexes
+submitter: WillItMod

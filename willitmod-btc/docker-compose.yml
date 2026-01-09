@@ -1,0 +1,219 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: axebtc-app
+      APP_PORT: 3000
+      JWT_SECRET: "${JWT_SECRET}"
+    networks:
+      - umbrel_main_network
+
+  init:
+    image: alpine:3.22.1
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+      - ${APP_DATA_DIR}:/appdata
+      - ${APP_DATA_DIR}/data/templates:/data/templates:ro
+    environment:
+      APPS_SUBNET: "${NETWORK_IP}/16"
+      RPC_USER: "btc"
+      RPC_PASSWORD: "${APP_PASSWORD}"
+      BTC_P2P_PORT: "28333"
+      BTC_RPC_PORT: "28332"
+      BTC_ZMQ_HASHBLOCK_PORT: "28335"
+      PAYOUT_ADDRESS: "CHANGEME_BTC_PAYOUT_ADDRESS"
+      FB_RPC_PORT: "8332"
+      FB_RPC_USER: "fractal"
+      FB_RPC_PASSWORD: "${APP_PASSWORD}"
+      FB_PAYOUT_ADDRESS: ""
+    command:
+      - /bin/sh
+      - -ec
+      - |-
+        set -eu
+
+        apk add --no-cache envsubst curl >/dev/null
+
+        # Persist Umbrel's JWT secret into ${APP_DATA_DIR}/.env so that SSH restarts
+        # (without Umbrel's exports.sh) don't boot app_proxy with an empty JWT_SECRET.
+        if [ -n "${JWT_SECRET:-}" ]; then
+          envfile="/appdata/.env"
+          tmp="/appdata/.env.tmp"
+          if [ -f "$$envfile" ]; then
+            grep -v '^JWT_SECRET=' "$$envfile" > "$$tmp" || true
+          else
+            : > "$$tmp"
+          fi
+          printf "JWT_SECRET=%s\n" "${JWT_SECRET}" >> "$$tmp"
+          chmod 600 "$$tmp" || true
+          chown 1000:1000 "$$tmp" || true
+          mv "$$tmp" "$$envfile"
+        fi
+
+        mkdir -p /data/node /data/pool/config /data/pool/www/pool /data/pool/www/users
+        mkdir -p /data/fractal
+
+        # Umbrel may create settings.yml as root during update/install; ensure it stays writable.
+        touch /appdata/settings.yml
+        chown 1000:1000 /appdata/settings.yml || true
+
+        if [ ! -f /data/node/bitcoin.conf ]; then
+          envsubst < /data/templates/bitcoin.conf.template > /data/node/bitcoin.conf
+          chown -R 1000:1000 /data/node
+        else
+          # Keep peer limit high on existing installs too.
+          if grep -q '^maxconnections=' /data/node/bitcoin.conf; then
+            sed -i 's/^maxconnections=.*/maxconnections=256/' /data/node/bitcoin.conf
+          else
+            echo '' >> /data/node/bitcoin.conf
+            echo 'maxconnections=256' >> /data/node/bitcoin.conf
+          fi
+          chown 1000:1000 /data/node/bitcoin.conf || true
+        fi
+
+        if [ ! -f /data/pool/config/ckpool.conf ]; then
+          envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
+          chown -R 1000:1000 /data/pool
+        else
+          # Upgrade safety: older installs may have a ckpool.conf without webdir/userdir,
+          # which prevents ckpool from writing per-user/worker stats (UI shows 0 workers).
+          needs_ckpool_regen=0
+          if ! grep -q '"btcaddress"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if ! grep -q '"webdir"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if ! grep -q '"userdir"' /data/pool/config/ckpool.conf; then
+            needs_ckpool_regen=1
+          fi
+          if [ "$$needs_ckpool_regen" -eq 1 ]; then
+            existing_addr="$$(grep -oE '\"btcaddress\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' /data/pool/config/ckpool.conf | head -n 1 | sed -E 's/.*\"btcaddress\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\\1/' || true)"
+            if [ -n "$$existing_addr" ] && [ "$$existing_addr" != "CHANGEME_BTC_PAYOUT_ADDRESS" ]; then
+              export PAYOUT_ADDRESS="$$existing_addr"
+            fi
+            mv /data/pool/config/ckpool.conf "/data/pool/config/ckpool.conf.bak.$(date +%s 2>/dev/null || echo 0)" || true
+            envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
+            chown -R 1000:1000 /data/pool
+          fi
+        fi
+
+        if [ ! -f /data/pool/config/ckpool.args ]; then
+          echo "-B" > /data/pool/config/ckpool.args
+          chown 1000:1000 /data/pool/config/ckpool.args || true
+        fi
+
+        if [ ! -f /data/fractal/bitcoin.conf ]; then
+          envsubst < /data/templates/fractal.conf.template > /data/fractal/bitcoin.conf
+          chown -R 1000:1000 /data/fractal
+        fi
+        if [ ! -f /data/fractal/sync_enabled ]; then
+          echo "0" > /data/fractal/sync_enabled
+          chown 1000:1000 /data/fractal/sync_enabled || true
+        fi
+
+  bitcoind:
+    image: ghcr.io/willitmod/umbrel-bitcoin:v1.1.0
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 15m30s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ${APP_DATA_DIR}/data/node:/data
+      - ${APP_DATA_DIR}/data/templates/bitcoind-entrypoint.sh:/bitcoind-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/bitcoind-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "bitcoin-cli -datadir=/data getblockchaininfo >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 2m
+
+  fractald:
+    image: fractalbitcoin/fractal:v0.2.9rc2
+    user: "1000:1000"
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    volumes:
+      - ${APP_DATA_DIR}/data/fractal:/data
+      - ${APP_DATA_DIR}/data/templates/fractald-entrypoint.sh:/fractald-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/fractald-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "bitcoin-cli -datadir=/data getblockchaininfo >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 2m
+
+  ckpool:
+    image: ghcr.io/willitmod/docker-ckpool-solo:590fb2a
+    entrypoint: ["/bin/sh"]
+    command:
+      - -ec
+      - |-
+        rm -f /tmp/ckpool/*.pid 2>/dev/null || true
+        ARGS="$(cat /config/ckpool.args 2>/dev/null || true)"
+        if command -v ckpool >/dev/null 2>&1; then
+          exec ckpool -k -L -c /config/ckpool.conf $$ARGS
+        elif [ -x /bin/ckpool ]; then
+          exec /bin/ckpool -k -L -c /config/ckpool.conf $$ARGS
+        elif [ -x /usr/bin/ckpool ]; then
+          exec /usr/bin/ckpool -k -L -c /config/ckpool.conf $$ARGS
+        else
+          echo "ckpool binary not found in image"
+          exit 1
+        fi
+    user: "1000:1000"
+    depends_on:
+      - bitcoind
+      - fractald
+    restart: on-failure
+    stop_grace_period: 30s
+    ports:
+      - "7890:3333/tcp"
+    volumes:
+      - ${APP_DATA_DIR}/data/pool/config:/config:ro
+      - ${APP_DATA_DIR}/data/pool/www:/www
+
+  app:
+    image: ghcr.io/willitmod/axebtc-app-umbrel-dev:0.7.9-alpha
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 30s
+    depends_on:
+      - bitcoind
+      - ckpool
+    networks:
+      default:
+        aliases:
+          - axebtc-app
+      umbrel_main_network:
+        aliases:
+          - axebtc-app
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    environment:
+      BTC_RPC_HOST: "bitcoind"
+      BTC_RPC_PORT: "28332"
+      BTC_RPC_USER: "btc"
+      BTC_RPC_PASS: "${APP_PASSWORD}"
+      FB_RPC_HOST: "fractald"
+      FB_RPC_PORT: "8332"
+      FB_RPC_USER: "fractal"
+      FB_RPC_PASS: "${APP_PASSWORD}"
+      CKPOOL_STATUS_DIR: "/data/pool/www/pool"
+      APP_CHANNEL: "ALPHA"
+      BITCOIND_IMAGE: "ghcr.io/willitmod/umbrel-bitcoin:v1.1.0"
+      FRACTAL_IMAGE: "fractalbitcoin/fractal:v0.2.9rc2"
+      CKPOOL_IMAGE: "ghcr.io/willitmod/docker-ckpool-solo:590fb2a"
+      STATIC_DIR: "/app/static"
+
+networks:
+  umbrel_main_network:
+    external: true
+    name: umbrel_main_network
