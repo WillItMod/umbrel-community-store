@@ -109,20 +109,12 @@ services:
             envsubst < /data/templates/fractal.conf.template > /data/fractal/bitcoin.conf
           else
             echo "WARN: missing /data/templates/fractal.conf.template; generating a minimal fractal bitcoin.conf"
-            printf '%s\n' \
-              'server=1' \
-              'txindex=0' \
-              'prune=30000' \
-              'maxconnections=256' \
-              "rpcport=${FB_RPC_PORT}" \
-              "rpcuser=${FB_RPC_USER}" \
-              "rpcpassword=${FB_RPC_PASSWORD}" \
-              'rpcbind=0.0.0.0' \
-              'rpcallowip=127.0.0.1/32' \
-              "rpcallowip=${APPS_SUBNET}" \
-              'rpcallowip=10.0.0.0/8' \
-              'rpcallowip=172.16.0.0/12' \
-              'rpcallowip=192.168.0.0/16' \
+            FB_RPC_PORT="${FB_RPC_PORT:-8332}"
+            FB_RPC_USER="${FB_RPC_USER:-fractal}"
+            FB_RPC_PASSWORD="${FB_RPC_PASSWORD:-changeme}"
+            APPS_SUBNET="${APPS_SUBNET:-10.0.0.0/8}"
+            printf "server=1\ntxindex=0\nprune=30000\nmaxconnections=256\nrpcport=%s\nrpcuser=%s\nrpcpassword=%s\nrpcbind=0.0.0.0\nrpcallowip=127.0.0.1/32\nrpcallowip=%s\nrpcallowip=10.0.0.0/8\nrpcallowip=172.16.0.0/12\nrpcallowip=192.168.0.0/16\n" \
+              "${FB_RPC_PORT}" "${FB_RPC_USER}" "${FB_RPC_PASSWORD}" "${APPS_SUBNET}" \
               > /data/fractal/bitcoin.conf
           fi
           chown -R 1000:1000 /data/fractal
@@ -200,7 +192,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.12-alpha
+    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.13-alpha
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
