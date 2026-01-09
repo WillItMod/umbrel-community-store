@@ -105,7 +105,26 @@ services:
         fi
 
         if [ ! -f /data/fractal/bitcoin.conf ]; then
-          envsubst < /data/templates/fractal.conf.template > /data/fractal/bitcoin.conf
+          if [ -f /data/templates/fractal.conf.template ]; then
+            envsubst < /data/templates/fractal.conf.template > /data/fractal/bitcoin.conf
+          else
+            echo "WARN: missing /data/templates/fractal.conf.template; generating a minimal fractal bitcoin.conf"
+            cat > /data/fractal/bitcoin.conf <<EOF
+server=1
+txindex=0
+prune=30000
+maxconnections=256
+rpcport=${FB_RPC_PORT}
+rpcuser=${FB_RPC_USER}
+rpcpassword=${FB_RPC_PASSWORD}
+rpcbind=0.0.0.0
+rpcallowip=127.0.0.1/32
+rpcallowip=${APPS_SUBNET}
+rpcallowip=10.0.0.0/8
+rpcallowip=172.16.0.0/12
+rpcallowip=192.168.0.0/16
+EOF
+          fi
           chown -R 1000:1000 /data/fractal
         fi
         if [ ! -f /data/fractal/sync_enabled ]; then
@@ -181,7 +200,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.9-alpha
+    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.10-alpha
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
