@@ -575,7 +575,7 @@ services:
         fi
 
         # Repair older DBs where blocks.poolid was created as an integer (breaks Miningcore /blocks API).
-        poolid_type="$$(psql -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -tA -c \"SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='blocks' AND column_name='poolid' LIMIT 1;\" 2>/dev/null | tr -d ' \t\r\n' || true)"
+        poolid_type="$$(psql -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -tA -c "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='blocks' AND column_name='poolid' LIMIT 1;" 2>/dev/null | tr -d ' \t\r\n' || true)"
         if [ -n "$$poolid_type" ] && [ "$$poolid_type" != "text" ] && [ "$$poolid_type" != "charactervarying" ] && [ "$$poolid_type" != "character varying" ]; then
           echo "[axedgb] Migrating DB: rebuilding blocks table (poolid type=$$poolid_type)"
           psql -v ON_ERROR_STOP=1 -h "$$DB_HOST" -p 5432 -U "$$DB_USER" -d "$$DB_NAME" -c "DROP TABLE IF EXISTS blocks;" >/dev/null
@@ -644,7 +644,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.4
+    image: ghcr.io/willitmod/axedgb-app:0.9.8
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
