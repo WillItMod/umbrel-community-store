@@ -33,9 +33,9 @@ services:
       DB_NAME: "miningcore"
       # Default VarDiff profile for DGB SHA256: Mixed (protect small miners, still works for larger rigs)
       # Min / Start / Max
-      SHA256_MINDIFF: "512"
-      SHA256_STARTDIFF: "2048"
-      SHA256_MAXDIFF_JSON: "65536"
+      SHA256_MINDIFF: "1024"
+      SHA256_STARTDIFF: "4096"
+      SHA256_MAXDIFF_JSON: "131072"
 
       # Conservative Scrypt defaults (leave room for low-hashrate miners)
       # Min / Start / Max
@@ -718,7 +718,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.102
+    image: ghcr.io/willitmod/axedgb-app:0.9.103
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
