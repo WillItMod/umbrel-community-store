@@ -9,53 +9,45 @@ description: >-
 
 
   Features:
-    - Axe-style dashboard for node sync and pool stats
-    - Pruning disabled by default (archival)
+    - Axe-style dashboard for node sync, Stratum status, and pool stats
+    - SHA256 + Scrypt Stratum ports in one app install
+    - SHA256 difficulty presets (vardiff) for small miners through to high-hashrate rigs
+    - Support ticket submission with basic diagnostics
 
 
   Miner connection:
-    - Set your payout address in the app Settings tab.
-    - URL: `stratum+tcp://<your-umbrel-ip>:5678`
-    - Username: `YOUR_DGB_ADDRESS.<worker-name>` (recommended)
-      Example: `dgb1q...bitaxe-01`
+    - Set your solo payout address in the app Settings tab.
+    - SHA256 Stratum URL: `stratum+tcp://<your-umbrel-ip>:5678`
+    - Scrypt Stratum URL: `stratum+tcp://<your-umbrel-ip>:5679`
+    - Username: a worker label (recommended: `rig01.workername`). `walletAddress.workername` also works, but it does not control payout.
     - Password: anything
 
 
   Notes:
     - Payout address must be a legacy/base58 DigiByte address (starts with `D`/`S`). `dgb1...` payout is not supported yet.
-    - Miner username can still be any string (many miners use `dgb1...workername`).
-    - Miningcore is used for Stratum + stats API.
+    - First sync and the first boot after some upgrades can be heavy on RAM and disk. 16GB is recommended; 8GB is the practical minimum.
     - Solo mining is extremely unlikely to find blocks without significant hashrate.
-    - This app generates an anonymous install ID used for support ticket submissions.
 
 
-  Backend (provenance):
+  Backend:
     - DigiByte Core (MIT): https://github.com/digibyte-core/digibyte
     - Miningcore (GPLv3): https://github.com/oliverw/miningcore
-    - This Umbrel app wires these components together; it does not patch DigiByte/Miningcore source code.
-
-
-  Licenses:
-    - DigiByte Core: MIT (https://github.com/digibyte-core/digibyte)
-    - Miningcore: GPLv3 (https://github.com/oliverw/miningcore)
-    - Postgres: PostgreSQL License (https://www.postgresql.org/about/licence/)
-    - Source and license texts for bundled components are available in the upstream repos above.
 
 
   Status:
-    - ALPHA build: expect bugs and breaking changes. Verify payout addresses before mining.
+    - BETA build: expect bugs and breaking changes. Verify payout addresses before mining.
 developer: WillItMod
-website: https://github.com/WillItMod/umbrel-dev-community-store
-repo: https://github.com/WillItMod/umbrel-dev-community-store
-support: https://github.com/WillItMod/umbrel-dev-community-store/issues
+website: https://github.com/WillItMod/umbrel-community-store
+repo: https://github.com/WillItMod/umbrel-community-store
+support: https://github.com/WillItMod/umbrel-community-store/issues
 dependencies: []
 port: 21213
-icon: https://raw.githubusercontent.com/WillItMod/umbrel-dev-community-store/main/willitmod-dev-dgb/icon.png
+icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-dgb/icon.png
 gallery:
-  - https://raw.githubusercontent.com/WillItMod/umbrel-dev-community-store/main/willitmod-dev-dgb/icon.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-dev-community-store/main/willitmod-dev-dgb/images/1.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-dev-community-store/main/willitmod-dev-dgb/images/2.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-dev-community-store/main/willitmod-dev-dgb/images/3.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-dgb/icon.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-dgb/images/1.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-dgb/images/2.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-dgb/images/3.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""
