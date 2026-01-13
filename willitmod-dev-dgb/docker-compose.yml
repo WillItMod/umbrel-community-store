@@ -132,6 +132,80 @@ services:
               } >> /data/node/digibyte.conf
             fi
           fi
+
+          # Ensure mainnet RPC is reachable from other containers.
+          # Older installs can have rpcbind=127.0.0.1 (or missing rpcallowip for the apps subnet),
+          # which makes the UI show "Running (stale)" and the pool report RPC backoff/connection refused.
+          if ! awk -v apps="$$APPS_SUBNET" 'BEGIN{inTest=0; okBind=0; okApps=0}
+            /^\\[test\\][[:space:]]*$/{inTest=1}
+            !inTest && $0=="rpcbind=0.0.0.0"{okBind=1}
+            !inTest && apps!="" && $0==("rpcallowip=" apps){okApps=1}
+            END{exit(okBind && okApps ? 0 : 1)}
+          ' /data/node/digibyte.conf; then
+            echo "[axedgb] Ensuring RPC bind/access settings in digibyte.conf"
+            awk -v apps="$$APPS_SUBNET" '
+              BEGIN{inTest=0; seenBind=0; seenLocal=0; seenApps=0; seen10=0; seen172=0; seen192=0}
+              function mark_allow(line){
+                if(line=="rpcallowip=127.0.0.1/32") seenLocal=1
+                else if(apps!="" && line==("rpcallowip=" apps)) seenApps=1
+                else if(line=="rpcallowip=10.0.0.0/8") seen10=1
+                else if(line=="rpcallowip=172.16.0.0/12") seen172=1
+                else if(line=="rpcallowip=192.168.0.0/16") seen192=1
+              }
+              function emit_missing(){
+                if(seenBind==0){ print "rpcbind=0.0.0.0"; seenBind=1 }
+                if(seenLocal==0){ print "rpcallowip=127.0.0.1/32"; seenLocal=1 }
+                if(seenApps==0 && apps!=""){ print "rpcallowip=" apps; seenApps=1 }
+                if(seen10==0){ print "rpcallowip=10.0.0.0/8"; seen10=1 }
+                if(seen172==0){ print "rpcallowip=172.16.0.0/12"; seen172=1 }
+                if(seen192==0){ print "rpcallowip=192.168.0.0/16"; seen192=1 }
+              }
+              /^\\[test\\][[:space:]]*$/{
+                if(inTest==0){
+                  if(seenBind==0 || seenLocal==0 || seenApps==0 || seen10==0 || seen172==0 || seen192==0){
+                    print ""
+                    print "# axedgb-rpc-access-v1"
+                    print "# Ensure RPC is reachable from other containers (app + miningcore)"
+                    emit_missing()
+                    print ""
+                  }
+                }
+                inTest=1
+                print
+                next
+              }
+              {
+                if(inTest==0){
+                  if($0 ~ /^rpcbind=/){
+                    if(seenBind==0){ print "rpcbind=0.0.0.0"; seenBind=1 }
+                    next
+                  }
+                  if($0 ~ /^rpcallowip=/){
+                    mark_allow($0)
+                    print
+                    next
+                  }
+                  print
+                  if(seenBind==0 && $0 ~ /^rpcpassword=/){
+                    print "rpcbind=0.0.0.0"; seenBind=1
+                  }
+                  next
+                }
+                print
+              }
+              END{
+                if(inTest==0){
+                  if(seenBind==0 || seenLocal==0 || seenApps==0 || seen10==0 || seen172==0 || seen192==0){
+                    print ""
+                    print "# axedgb-rpc-access-v1"
+                    print "# Ensure RPC is reachable from other containers (app + miningcore)"
+                    emit_missing()
+                    print ""
+                  }
+                }
+              }
+            ' /data/node/digibyte.conf > /data/node/digibyte.conf.tmp && mv /data/node/digibyte.conf.tmp /data/node/digibyte.conf
+          fi
           if ! grep -q 'axedgb-seeds-v1' /data/node/digibyte.conf; then
             echo "[axedgb] Adding bootstrap peers to digibyte.conf"
             {
@@ -644,7 +718,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.99
+    image: ghcr.io/willitmod/axedgb-app:0.9.101
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
