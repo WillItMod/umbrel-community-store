@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-btc
 category: bitcoin
 name: AxeBTCF
-version: "0.7.46"
+version: "0.7.47"
 tagline: BTC node + solo pool + AxePoW
 description: >-
   Run a Bitcoin (BTC) full node (Bitcoin Core) and a solo Stratum v1 pool (ckpool) as a single Umbrel app installation.
