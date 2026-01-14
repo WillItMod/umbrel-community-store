@@ -125,7 +125,7 @@ services:
         fi
 
   bitcoind:
-    image: ghcr.io/willitmod/axebtc-bitcoind-switch:0.7.41
+    image: ghcr.io/willitmod/axebtc-bitcoind-switch:0.7.44
     user: "1000:1000"
     restart: unless-stopped
     stop_grace_period: 15m30s
@@ -192,7 +192,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.41
+    image: ghcr.io/willitmod/axebtc-app-umbrel:0.7.46
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -219,7 +219,7 @@ services:
       FB_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
       APP_CHANNEL: "ALPHA"
-      BITCOIND_IMAGE: "ghcr.io/willitmod/axebtc-bitcoind-switch:0.7.41"
+      BITCOIND_IMAGE: "ghcr.io/willitmod/axebtc-bitcoind-switch:0.7.44"
       FRACTAL_IMAGE: "fractalbitcoin/fractal:v0.2.9rc2"
       CKPOOL_IMAGE: "ghcr.io/willitmod/docker-ckpool-solo:590fb2a"
       STATIC_DIR: "/app/static"
