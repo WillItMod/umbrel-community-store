@@ -703,7 +703,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/postgres:/var/lib/postgresql/data
 
   miningcore:
-    image: ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r22
+    image: ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r23
     restart: unless-stopped
     depends_on:
       - postgres
@@ -744,7 +744,7 @@ services:
       MININGCORE_CONF_PATH: "/data/pool/config/miningcore.json"
       APP_CHANNEL: "BETA"
       DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.22.2"
-      MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r22"
+      MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r23"
       POSTGRES_IMAGE: "postgres:16-alpine"
       STATIC_DIR: "/app/static"
 
