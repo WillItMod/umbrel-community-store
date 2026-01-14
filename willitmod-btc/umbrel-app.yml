@@ -5,7 +5,7 @@ name: AxeBTCF
 version: "0.7.47"
 tagline: BTC node + solo pool + AxePoW
 description: >-
-  Run a Bitcoin (BTC) full node (Bitcoin Core) and a solo Stratum v1 pool (ckpool) as a single Umbrel app installation.
+  Run a Bitcoin (BTC) full node (Bitcoin Core or Bitcoin Knots) and a solo Stratum v1 pool (ckpool) as a single Umbrel app installation.
 
 
   Optional: enable AxePoW mode for Fractal Bitcoin merged mining (Bitcoin AuxPoW). Disabled by default.
@@ -19,6 +19,9 @@ description: >-
 
   Notes:
     - Set your payout address in the app Settings tab.
+    - On first launch you must pick Bitcoin Core vs Knots before sync starts.
+    - Switching Core/Knots triggers an in-app migration and can take a while; avoid restarting the app or powering off Umbrel while it migrates.
+    - AxePoW (Fractal) needs additional disk space and sync time; the last part of sync can be slow.
     - BTC payout addresses support bech32 (`bc1...`) and legacy (`1...` / `3...`). Bitcoin Cash CashAddr (`q...` / `p...`) is not supported.
 developer: WillItMod
 website: https://github.com/WillItMod/umbrel-community-store
