@@ -35,20 +35,23 @@ if [ -z "$dbcache" ] && [ -r /proc/meminfo ]; then
   mem_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)"
   if [ -n "$mem_kb" ]; then
     mem_mb="$((mem_kb / 1024))"
-    if [ "$mem_mb" -lt 6144 ]; then
-      dbcache="2048"
-    elif [ "$mem_mb" -lt 12288 ]; then
+    if [ "$mem_mb" -lt 12288 ]; then
+      # 8GB host -> 4GB dbcache
       dbcache="4096"
+    elif [ "$mem_mb" -lt 16384 ]; then
+      # 12GB host -> 6GB dbcache
+      dbcache="6144"
     else
+      # 16GB+ host -> 8GB dbcache
       dbcache="8192"
     fi
   fi
 fi
 
 if [ -n "$dbcache" ] && echo "$dbcache" | grep -Eq '^[0-9]+$'; then
-  if [ "$dbcache" -lt 2048 ]; then
-    echo "[axedgb] WARNING: dbcache=$dbcache too low; clamping to 2048MB minimum"
-    dbcache="2048"
+  if [ "$dbcache" -lt 4096 ]; then
+    echo "[axedgb] WARNING: dbcache=$dbcache too low; clamping to 4096MB minimum"
+    dbcache="4096"
   fi
 fi
 

@@ -217,7 +217,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebch-app-umbrel-dev:0.7.139
+    image: ghcr.io/willitmod/axebch-app-umbrel-dev:0.7.145
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -241,7 +241,6 @@ services:
       BCH_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
       APP_CHANNEL: "RC1"
-      APP_VERSION_SUFFIX: "-dev"
       BCHN_IMAGE: "mainnet/bitcoin-cash-node:v28.0.1"
       CKPOOL_IMAGE: "ghcr.io/getumbrel/docker-ckpool-solo:590fb2a"
       STATIC_DIR: "/app/static"

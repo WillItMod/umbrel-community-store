@@ -75,9 +75,9 @@ services:
         else
           raw="$$(cat /data/node/.dbcache_mb 2>/dev/null | tr -d ' \t\r\n' || true)"
           if echo "$$raw" | grep -Eq '^[0-9]+$$'; then
-            if [ "$$raw" -lt 2048 ]; then
-              echo "[axedgb] Bumping dbcache preset to 2048MB minimum"
-              echo "2048" > /data/node/.dbcache_mb
+            if [ "$$raw" -lt 4096 ]; then
+              echo "[axedgb] Bumping dbcache preset to 4096MB minimum"
+              echo "4096" > /data/node/.dbcache_mb
               chown 1000:1000 /data/node/.dbcache_mb || true
             fi
           fi
@@ -271,11 +271,16 @@ services:
           # Self-heal older/broken installs:
           # - Some legacy versions wrote a pool-only JSON (missing top-level api/persistence/logging keys).
           # - Interrupted writes can leave a malformed schema that Miningcore refuses to start with.
-          if ! jq -e '
-            type=="object"
-            and (.pools | type=="array")
-            and (.api | type=="object")
-            and (.persistence.postgres | type=="object")
+          # Require EXACTLY one JSON object (not a JSON stream). Duplicated objects (two JSON objects
+          # back-to-back) will pass jq's streaming parser but Miningcore will fail to parse them.
+          if ! jq -se '
+            length==1
+            and (.[0]
+              | type=="object"
+              and (.pools | type=="array")
+              and (.api | type=="object")
+              and (.persistence.postgres | type=="object")
+            )
           ' "$$miningcore_conf" >/dev/null 2>&1; then
             echo "[axedgb] miningcore.json schema invalid; regenerating from template"
             regen_mc="1"
@@ -290,10 +295,11 @@ services:
         else
           # Normalize config across upgrades (some Miningcore builds don't accept banning.manager,
           # and Miningcore currently assumes notifications exists).
-          if command -v jq >/dev/null 2>&1 && jq -e '.' >/dev/null 2>&1 < /data/pool/config/miningcore.json; then
+          if command -v jq >/dev/null 2>&1 && jq -se 'length==1 and (.[0] | type=="object")' /data/pool/config/miningcore.json >/dev/null 2>&1; then
             tmp="/data/pool/config/miningcore.json.tmp"
             jq --argjson rpcport "$$DGB_RPC_PORT" '
-              .notifications = (.notifications // {"enabled": false})
+              .[0]
+              | .notifications = (.notifications // {"enabled": false})
               | (.banning |= (if type=="object" then del(.manager) else . end))
               | (.pools |= (if type=="array" then map(
                   if type=="object" then
@@ -310,18 +316,18 @@ services:
                     | (.daemons = ((.daemons // []) | (if type=="array" then map(if type=="object" then (.port=$$rpcport) else . end) else . end)))
                   else . end
                 ) else . end))
-            ' /data/pool/config/miningcore.json > "$$tmp" && mv "$$tmp" /data/pool/config/miningcore.json
+            ' -s /data/pool/config/miningcore.json > "$$tmp" && mv "$$tmp" /data/pool/config/miningcore.json
 
             # Ensure the Scrypt pool exists when upgrading from SHA256-only configs.
-            if ! jq -e '.pools[]? | select(.id=="dgb-scrypt-1")' /data/pool/config/miningcore.json >/dev/null 2>&1; then
+            if ! jq -se 'length==1 and any(.[0].pools[]?; .id=="dgb-scrypt-1")' /data/pool/config/miningcore.json >/dev/null 2>&1; then
               echo "[axedgb] Adding dgb-scrypt-1 Miningcore pool"
-              base_addr="$(jq -r '.pools[]? | select(.id=="dgb-sha256-1") | .address // empty' /data/pool/config/miningcore.json | head -n 1)"
+              base_addr="$(jq -r -s '.[0].pools[]? | select(.id=="dgb-sha256-1") | .address // empty' /data/pool/config/miningcore.json | head -n 1)"
               base_enabled="true"
               if [ -z "$$base_addr" ]; then base_enabled="false"; fi
               base_diff="$${SCRYPT_STARTDIFF:-1}"
               base_mindiff="$${SCRYPT_MINDIFF:-1}"
               base_maxdiff_json="$${SCRYPT_MAXDIFF_JSON:-128}"
-              daemons_json="$(jq -c '.pools[]? | select(.id=="dgb-sha256-1") | (.daemons // [])' /data/pool/config/miningcore.json | head -n 1)"
+              daemons_json="$(jq -c -s '.[0].pools[]? | select(.id=="dgb-sha256-1") | (.daemons // [])' /data/pool/config/miningcore.json | head -n 1)"
               if [ -z "$$daemons_json" ]; then daemons_json='[]'; fi
               if [ -z "$$base_maxdiff_json" ]; then base_maxdiff_json='null'; fi
 
@@ -333,7 +339,8 @@ services:
                  --argjson maxdiff "$$base_maxdiff_json" \
                  --argjson daemons "$$daemons_json" \
                  '
-                 .pools = (.pools // []) + [{
+                 .[0]
+                 | .pools = (.pools // []) + [{
                    "id": "dgb-scrypt-1",
                    "enabled": $$enabled,
                    "coin": "digibyte-scrypt",
@@ -358,7 +365,7 @@ services:
                    },
                    "daemons": $$daemons
                  }]
-                 ' /data/pool/config/miningcore.json > "$$tmp2" && mv "$$tmp2" /data/pool/config/miningcore.json
+                 ' -s /data/pool/config/miningcore.json > "$$tmp2" && mv "$$tmp2" /data/pool/config/miningcore.json
             fi
 
             # Apply user-saved payout address + varDiff settings (saved by the UI into a state file).
@@ -383,6 +390,8 @@ services:
                    --argjson startdiff "$${desired_startdiff:-0}" \
                    --argjson maxdiff "$${desired_maxdiff:-0}" \
                    '
+                   .[0]
+                   |
                    def apply_port(p):
                      p
                      | .listenAddress = "0.0.0.0"
@@ -400,10 +409,10 @@ services:
                        | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then apply_port(.) else . end)) else . end))
                      elif (.id=="dgb-scrypt-1") then
                        (.enabled = true)
-                       | (.address = $$addr)
-                     else . end
-                   ) else . end))
-                   ' /data/pool/config/miningcore.json > "$$tmp_apply" && mv "$$tmp_apply" /data/pool/config/miningcore.json
+                     | (.address = $$addr)
+                   else . end
+                 ) else . end))
+                   ' -s /data/pool/config/miningcore.json > "$$tmp_apply" && mv "$$tmp_apply" /data/pool/config/miningcore.json
               fi
             fi
 
@@ -412,16 +421,17 @@ services:
             # - We keep a placeholder address to allow Miningcore to start, but Stratum must not be exposed until the user sets a real payout address.
             #
             # If address is bech32, empty, or placeholder: force placeholder and bind Stratum to localhost.
-            if jq -r '.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") | (.address // "")' /data/pool/config/miningcore.json | grep -qiE '^(dgb1|)$|^D596YFweJQuHY1BbjazZYmAbt8jJPbKehC$'; then
+            if jq -r -s '.[0].pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") | (.address // "")' /data/pool/config/miningcore.json | grep -qiE '^(dgb1|)$|^D596YFweJQuHY1BbjazZYmAbt8jJPbKehC$'; then
               echo "[axedgb] Payout address not configured (or unsupported); binding Stratum to localhost until a real legacy address is set"
               tmp3="/data/pool/config/miningcore.json.tmp3"
               jq '
-                (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
+                .[0]
+                | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
                   | .enabled=true
                   | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
                   | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
                 ) | .
-              ' /data/pool/config/miningcore.json > "$$tmp3" && mv "$$tmp3" /data/pool/config/miningcore.json
+              ' -s /data/pool/config/miningcore.json > "$$tmp3" && mv "$$tmp3" /data/pool/config/miningcore.json
             fi
           fi
         fi
@@ -439,7 +449,7 @@ services:
         mc_repaired="0"
         if [ "$$regen_mc" = "1" ]; then mc_repaired="1"; fi
 
-        if command -v jq >/dev/null 2>&1 && jq -e '.' >/dev/null 2>&1 < "$$miningcore_conf"; then
+        if command -v jq >/dev/null 2>&1 && jq -se 'length==1 and (.[0] | type=="object")' "$$miningcore_conf" >/dev/null 2>&1; then
           settings="/data/ui/state/pool_settings.json"
           if [ -f "$$settings" ] && jq -e '.' >/dev/null 2>&1 < "$$settings"; then
             desired_addr="$(jq -r '.payoutAddress // empty' "$$settings" | tr -d ' \t\r\n')"
@@ -459,6 +469,8 @@ services:
                  --argjson startdiff "$${desired_startdiff:-0}" \
                  --argjson maxdiff "$${desired_maxdiff:-0}" \
                  '
+                 .[0]
+                 |
                  def apply_port(p):
                    p
                    | .listenAddress = "0.0.0.0"
@@ -478,46 +490,48 @@ services:
                      (.enabled = true)
                      | (.address = $$addr)
                    else . end
-                 ) else . end))
-                 ' "$$miningcore_conf" > "$$tmp_apply" && mv "$$tmp_apply" "$$miningcore_conf"
+                   ) else . end))
+                 ' -s "$$miningcore_conf" > "$$tmp_apply" && mv "$$tmp_apply" "$$miningcore_conf"
               applied_settings="1"
             fi
           fi
 
           # Safety: if payout is empty/placeholder/bech32: lock Stratum to localhost.
-          if jq -r '.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") | (.address // "")' "$$miningcore_conf" | grep -qiE '^(dgb1|)$|^D596YFweJQuHY1BbjazZYmAbt8jJPbKehC$'; then
+          if jq -r -s '.[0].pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") | (.address // "")' "$$miningcore_conf" | grep -qiE '^(dgb1|)$|^D596YFweJQuHY1BbjazZYmAbt8jJPbKehC$'; then
             stratum_locked="1"
             tmp3="/data/pool/config/miningcore.json.tmp_lock"
             jq '
-              (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
+              .[0]
+              | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
                 | .enabled=true
                 | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
                 | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
               ) | .
-            ' "$$miningcore_conf" > "$$tmp3" && mv "$$tmp3" "$$miningcore_conf"
+            ' -s "$$miningcore_conf" > "$$tmp3" && mv "$$tmp3" "$$miningcore_conf"
           fi
 
-          applied_addr="$(jq -r '.pools[]? | select(.id=="dgb-sha256-1") | (.address // empty)' "$$miningcore_conf" | head -n 1)"
+          applied_addr="$(jq -r -s '.[0].pools[]? | select(.id=="dgb-sha256-1") | (.address // empty)' "$$miningcore_conf" | head -n 1)"
 
           # Final validation: ensure miningcore.json is valid and has required keys.
-          if ! jq -e 'type=="object" and (.pools|type=="array") and (.api|type=="object") and (.persistence.postgres|type=="object")' "$$miningcore_conf" >/dev/null 2>&1; then
+          if ! jq -se 'length==1 and (.[0] | type=="object" and (.pools|type=="array") and (.api|type=="object") and (.persistence.postgres|type=="object"))' "$$miningcore_conf" >/dev/null 2>&1; then
             echo "[axedgb] ERROR: miningcore.json invalid after repair/apply; regenerating and locking Stratum"
             ts="$$(date +%s)"
             mv "$$miningcore_conf" "$$miningcore_conf.broken.$$ts" 2>/dev/null || true
             envsubst < "$$miningcore_tpl" > "$$miningcore_conf"
             tmp_lock="/data/pool/config/miningcore.json.tmp_lock2"
             jq '
-              (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
+              .[0]
+              | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
                 | .enabled=true
                 | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
                 | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
               ) | .
-            ' "$$miningcore_conf" > "$$tmp_lock" && mv "$$tmp_lock" "$$miningcore_conf"
+            ' -s "$$miningcore_conf" > "$$tmp_lock" && mv "$$tmp_lock" "$$miningcore_conf"
             chown -R 1000:1000 /data/pool/config || true
             mc_repaired="1"
             applied_settings="0"
             stratum_locked="1"
-            applied_addr="$(jq -r '.pools[]? | select(.id=="dgb-sha256-1") | (.address // empty)' "$$miningcore_conf" | head -n 1)"
+            applied_addr="$(jq -r -s '.[0].pools[]? | select(.id=="dgb-sha256-1") | (.address // empty)' "$$miningcore_conf" | head -n 1)"
           fi
         fi
 
@@ -743,7 +757,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.125
+    image: ghcr.io/willitmod/axedgb-app:0.9.130
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -769,7 +783,6 @@ services:
       STRATUM_PORTS: "sha256:5678,scrypt:5679"
       MININGCORE_CONF_PATH: "/data/pool/config/miningcore.json"
       APP_CHANNEL: "BETA"
-      APP_VERSION_SUFFIX: "-dev"
       DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.22.2"
       MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r24"
       POSTGRES_IMAGE: "postgres:16-alpine"
