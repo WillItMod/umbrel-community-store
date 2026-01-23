@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-btc
 category: bitcoin
 name: AxeBTCF
-version: "0.7.72"
+version: "0.7.74"
 tagline: BTC node + solo pool + AxePoW
 description: >-
   Run a Bitcoin (BTC) full node (Bitcoin Core or Bitcoin Knots) and an integrated solo Stratum v1 pool (ckpool) as a single app.
