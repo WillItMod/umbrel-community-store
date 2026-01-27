@@ -68,6 +68,17 @@ services:
 
         mkdir -p /data/node /data/pool/config /data/pool/postgres /data/templates
 
+        # Postgres runs as uid:gid 70:70 in the official alpine images.
+        # Ensure the bind-mounted datadir is writable to avoid "pg_filenode.map: Permission denied" on upgrades.
+        pg_dir="/data/pool/postgres"
+        pg_uid="$$(stat -c '%u' \"$$pg_dir\" 2>/dev/null || echo '')"
+        pg_gid="$$(stat -c '%g' \"$$pg_dir\" 2>/dev/null || echo '')"
+        if [ "$$pg_uid" != "70" ] || [ "$$pg_gid" != "70" ]; then
+          echo "[axedgb] Fixing Postgres datadir ownership (70:70)"
+          chown -R 70:70 "$$pg_dir" 2>/dev/null || true
+        fi
+        chmod 700 "$$pg_dir" 2>/dev/null || true
+
         # Ensure dbcache preset exists. The UI can change this later.
         if [ ! -f /data/node/.dbcache_mb ]; then
           echo "auto" > /data/node/.dbcache_mb
