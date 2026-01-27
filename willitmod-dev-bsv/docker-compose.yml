@@ -61,7 +61,7 @@ services:
         # Pruning is mandatory for AxeBSV to reduce retained history.
         # Enforce: missing/0/<2500 -> 2500, >5000 -> 5000.
         if grep -qE '^[[:space:]]*prune=' "$$cfg" 2>/dev/null; then
-          current_prune="$$(grep -E '^[[:space:]]*prune=' "$$cfg" | tail -n 1 | sed -E 's/^[[:space:]]*prune=([0-9]+).*/\\1/' || true)"
+          current_prune="$$(grep -E '^[[:space:]]*prune=' "$$cfg" | tail -n 1 | sed -E 's/^[[:space:]]*prune=//; s/[^0-9].*$//' || true)"
           if [ -z "$$current_prune" ] || [ "$$current_prune" = "0" ] || [ "$$current_prune" -lt "$$prune_default" ]; then
             sed -i "s/^[[:space:]]*prune=.*/prune=$$prune_default/" "$$cfg"
           elif [ "$$current_prune" -gt "$$prune_max" ]; then
@@ -189,7 +189,7 @@ services:
         fi
 
   app:
-    image: ghcr.io/willitmod/axebsv-app-umbrel-dev:0.7.172
+    image: ghcr.io/willitmod/axebsv-app-umbrel-dev:0.7.173
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s

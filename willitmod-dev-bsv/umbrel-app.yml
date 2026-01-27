@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-dev-bsv
 category: bitcoin
 name: AxeBSV
-version: "0.7.172"
+version: "0.7.173"
 tagline: BSV node + solo pool
 description: >-
   IMPORTANT: AMD64/x86_64 only. ARM/arm64 (Raspberry Pi) is not supported because the BSV node image (bitcoinsv/bitcoin-sv:1.2.0) is amd64-only.
