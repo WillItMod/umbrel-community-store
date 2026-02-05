@@ -7,7 +7,7 @@ services:
       APP_PORT: 5210
 
   server:
-    image: ghcr.io/willitmod/axelive-release:v1.2-r1@sha256:ef42296f4997fb0534b9279ccf538905d9c668f9a9b2c8ee71704c09a5c69c1b
+    image: ghcr.io/willitmod/axelive:v1.3@sha256:cee6cebc5414e4562e8faf0dd874774d14d276c10bb402b782aa679ce92c5d82
     restart: on-failure
     stop_grace_period: 30s
     init: true

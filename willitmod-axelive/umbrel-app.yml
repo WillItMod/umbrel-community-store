@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axelive
 category: bitcoin
 name: AxeLive
-version: "1.2"
+version: "1.3"
 tagline: Real-time miner monitoring and thermal control
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axelive/icon.png
 description: >-
@@ -21,6 +21,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  Multi-arch container rebuild for v1.2 (amd64 + arm64). Note: this Umbrel app does not bind a fixed host port to avoid port conflicts; access it via Umbrel.
+  v1.3: Removes Patreon sign-in/banners/limits; keeps licensing telemetry ping.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c
