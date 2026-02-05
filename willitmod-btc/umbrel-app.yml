@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-btc
 category: bitcoin
 name: AxeBTC
-version: "0.7.82.2"
+version: "0.7.82.4"
 tagline: BTC node + solo pool
 description: >-
   Run a Bitcoin (BTC) full node (Bitcoin Core or Bitcoin Knots) and an integrated solo Stratum v1 pool (ckpool) as a single app.
@@ -22,7 +22,7 @@ description: >-
 developer: WillItMod
 website: https://github.com/WillItMod/umbrel-community-store
 repo: https://github.com/WillItMod/umbrel-community-store
-support: https://github.com/WillItMod/umbrel-community-store/issues
+support: https://discord.gg/vC2UrFAbUF
 dependencies: []
 port: 21215
 icon: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/icon.png"

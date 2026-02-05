@@ -1,11 +1,11 @@
 manifestVersion: 1
-id: willitmod-dev-bch
+id: willitmod-dev-xec
 category: bitcoin
-name: AxeBCH
-version: "0.7.153"
-tagline: BCH node + solo pool
+name: AxeXEC
+version: "0.1.3"
+tagline: XEC node + solo pool
 description: >-
-  Run a Bitcoin Cash full node (BCHN) and an integrated solo Stratum v1 pool (ckpool) as a single app.
+  Run an eCash (XEC) full node and an integrated solo Stratum v1 pool (ckpool) as a single app.
 
 
   Features:
@@ -18,40 +18,40 @@ description: >-
 
   Miner connection:
     - Set your payout address in the app Settings tab.
-    - URL: `stratum+tcp://<your-host-ip>:4567`
+    - URL: `stratum+tcp://<your-host-ip>:4321`
     - Username: worker name (optional). `walletAddress.workername` also works, but it does not control payout.
       Example: `rig01.workername`
     - Password: anything
 
 
   Notes:
-    - For maximum compatibility, use a legacy BCH Base58 address (`1...` / `3...`) as the payout address.
-    - Many wallets (e.g. Trust Wallet) show CashAddr (`q...` / `p...`). AxeBCH automatically converts CashAddr to legacy format for ckpool compatibility and shows the converted address.
-    - Conversion happens locally on your device; AxeBCH does not send your address to any external service.
+    - For maximum compatibility, use a legacy Base58 address (`1...` / `3...`) as the payout address.
+    - Many wallets show CashAddr (`ecash:q...` / `ecash:p...`). AxeXEC automatically converts CashAddr to legacy format for ckpool compatibility and shows the converted address.
+    - Conversion happens locally on your device; AxeXEC does not send your address to any external service.
     - Reference converter (CashAddr <-> legacy): https://bch.info/en/tools/cashaddr
     - Solo mining is extremely unlikely to find blocks without significant hashrate.
     - First sync can be slow on small or busy systems. SSD strongly recommended.
 
 
   Components:
-    - Bitcoin Cash Node (BCHN) full node (MIT): https://gitlab.com/bitcoin-cash-node/bitcoin-cash-node
+    - Bitcoin ABC (eCash) full node (MIT): https://github.com/Bitcoin-ABC/bitcoin-abc
     - ckpool (GPLv3) solo pool engine: https://github.com/ctubio/ckpool
 
 
   Status:
-    - STABLE build: verify payout addresses before mining.
+    - ALPHA build: expect bugs. Verify payout addresses before mining.
 developer: WillItMod
-website: https://github.com/WillItMod/umbrel-community-store
-repo: https://github.com/WillItMod/umbrel-community-store
+website: https://github.com/WillItMod/AxeXEC
+repo: https://github.com/WillItMod/AxeXEC
 support: https://discord.gg/vC2UrFAbUF
 dependencies: []
-port: 21212
-icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch/icon.png
+port: 21218
+icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-xec/icon.png
 gallery:
-  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch/icon.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch/images/1.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch/images/2.png
-  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bch/images/3.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-xec/icon.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-xec/images/1.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-xec/images/2.png
+  - https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-xec/images/3.png
 path: ""
 defaultUsername: ""
 defaultPassword: ""
@@ -59,19 +59,19 @@ widgets:
   - id: "sync"
     type: "text-with-progress"
     refresh: "5s"
-    endpoint: "axebch-app:3000/api/widget/sync"
+    endpoint: "axexec-app:3000/api/widget/sync"
     link: ""
     example:
       type: "text-with-progress"
       link: ""
-      title: "BCH sync"
+      title: "XEC sync"
       text: "83%"
       progressLabel: "In progress"
       progress: 0.83
   - id: "pool"
     type: "three-stats"
     refresh: "30s"
-    endpoint: "axebch-app:3000/api/widget/pool"
+    endpoint: "axexec-app:3000/api/widget/pool"
     link: ""
     example:
       type: "three-stats"

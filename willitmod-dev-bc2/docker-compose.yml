@@ -3,7 +3,7 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: axebsv-app
+      APP_HOST: axebc2-app
       APP_PORT: 3000
       JWT_SECRET: "${JWT_SECRET}"
     networks:
@@ -17,20 +17,22 @@ services:
       - ${APP_DATA_DIR}/data/templates:/data/templates:rw
     environment:
       APPS_SUBNET: "${NETWORK_IP}/16"
-      RPC_USER: "bsv"
+      RPC_USER: "btc2"
       RPC_PASSWORD: "${APP_PASSWORD}"
-      BSV_RPC_PORT: "8332"
-      BSV_P2P_PORT: "8333"
-      BSV_ZMQ_HASHBLOCK_PORT: "28336"
-      PAYOUT_ADDRESS: "CHANGEME_BSV_PAYOUT_ADDRESS"
+      BTC2_RPC_PORT: "8337"
+      BTC2_P2P_PORT: "8338"
+      BTC2_ZMQ_HASHBLOCK_PORT: "28336"
+      PAYOUT_ADDRESS: "CHANGEME_BTC2_PAYOUT_ADDRESS"
     command:
       - /bin/sh
       - -ec
       - |-
         set -eu
 
-        apk add --no-cache envsubst curl jq >/dev/null
+        apk add --no-cache envsubst jq >/dev/null
 
+        # Persist JWT secret into ${APP_DATA_DIR}/.env so that SSH restarts
+        # (without exports.sh) don't boot app_proxy with an empty JWT_SECRET.
         if [ -n "${JWT_SECRET:-}" ]; then
           envfile="/appdata/.env"
           tmp="/appdata/.env.tmp"
@@ -47,49 +49,14 @@ services:
 
         mkdir -p /data/node /data/pool/config /data/pool/www/pool /data/pool/www/users
 
-        if [ ! -f /data/node/bitcoin.conf ]; then
-          envsubst < /data/templates/bitcoin.conf.template > /data/node/bitcoin.conf
-          chown -R 1000:1000 /data/node
-        fi
+        # The host may create settings.yml as root during update/install; ensure it stays writable.
+        touch /appdata/settings.yml
+        chown 1000:1000 /appdata/settings.yml || true
 
-        # Keep critical policy values aligned with the app template (existing installs keep their old config otherwise).
-        # NOTE: docker-compose performs $VAR substitution in yaml; use $$ to pass $VAR through to the shell.
-        cfg="/data/node/bitcoin.conf"
-        prune_default=2500
-        prune_max=5000
-
-        # Pruning is mandatory for AxeBSV to reduce retained history.
-        # Enforce: missing/0/<2500 -> 2500, >5000 -> 5000.
-        if grep -qE '^[[:space:]]*prune=' "$$cfg" 2>/dev/null; then
-          current_prune="$$(grep -E '^[[:space:]]*prune=' "$$cfg" | tail -n 1 | sed -E 's/^[[:space:]]*prune=//; s/[^0-9].*$//' || true)"
-          if [ -z "$$current_prune" ] || [ "$$current_prune" = "0" ] || [ "$$current_prune" -lt "$$prune_default" ]; then
-            sed -i "s/^[[:space:]]*prune=.*/prune=$$prune_default/" "$$cfg"
-          elif [ "$$current_prune" -gt "$$prune_max" ]; then
-            sed -i "s/^[[:space:]]*prune=.*/prune=$$prune_max/" "$$cfg"
-          fi
-        else
-          echo "prune=$$prune_default" >> "$$cfg"
+        if [ ! -f /data/node/bitcoinII.conf ]; then
+          envsubst < /data/templates/bitcoinII.conf.template > /data/node/bitcoinII.conf
+          chown -R 1000:1000 /data/node || true
         fi
-
-        if grep -qE '^[[:space:]]*excessiveblocksize=' "$$cfg" 2>/dev/null; then
-          sed -i 's/^[[:space:]]*excessiveblocksize=.*/excessiveblocksize=0/' "$$cfg"
-        else
-          echo 'excessiveblocksize=0' >> "$$cfg"
-        fi
-
-        if grep -qE '^[[:space:]]*maxstackmemoryusageconsensus=' "$$cfg" 2>/dev/null; then
-          sed -i 's/^[[:space:]]*maxstackmemoryusageconsensus=.*/maxstackmemoryusageconsensus=0/' "$$cfg"
-        else
-          echo 'maxstackmemoryusageconsensus=0' >> "$$cfg"
-        fi
-
-        if ! grep -qE '^[[:space:]]*minminingtxfee=' /data/node/bitcoin.conf 2>/dev/null; then
-          echo "minminingtxfee=0.000005" >> /data/node/bitcoin.conf
-        fi
-        if ! grep -qE '^[[:space:]]*zmqpubhashblock=' /data/node/bitcoin.conf 2>/dev/null; then
-          echo "zmqpubhashblock=tcp://0.0.0.0:$${BSV_ZMQ_HASHBLOCK_PORT}" >> /data/node/bitcoin.conf
-        fi
-        chown 1000:1000 /data/node/bitcoin.conf || true
 
         needs_ckpool_regen=0
         if [ -f /data/pool/config/ckpool.conf ]; then
@@ -109,7 +76,7 @@ services:
             mv /data/pool/config/ckpool.conf "/data/pool/config/ckpool.conf.bak.$$(date +%s 2>/dev/null || echo 0)" || true
           fi
           envsubst < /data/templates/ckpool.conf.template > /data/pool/config/ckpool.conf
-          if [ -n "$$existing_addr" ] && [ "$$existing_addr" != "CHANGEME_BSV_PAYOUT_ADDRESS" ]; then
+          if [ -n "$$existing_addr" ] && [ "$$existing_addr" != "CHANGEME_BTC2_PAYOUT_ADDRESS" ]; then
             tmp="$$(mktemp)"
             if jq --arg a "$$existing_addr" '.btcaddress=$$a' /data/pool/config/ckpool.conf > "$$tmp" 2>/dev/null; then
               mv "$$tmp" /data/pool/config/ckpool.conf
@@ -117,7 +84,7 @@ services:
               rm -f "$$tmp" || true
             fi
           fi
-          chown -R 1000:1000 /data/pool
+          chown -R 1000:1000 /data/pool || true
         fi
 
         if [ ! -f /data/pool/config/ckpool.args ]; then
@@ -139,34 +106,28 @@ services:
           fi
         fi
 
-  bsvd:
-    image: bitcoinsv/bitcoin-sv:1.2.0
+  btc2d:
+    image: ghcr.io/willitmod/bitcoinii-core:29.1.0
     user: "1000:1000"
     restart: unless-stopped
+    stop_grace_period: 15m30s
     depends_on:
       init:
         condition: service_completed_successfully
-    ports:
-      - "8333:8333/tcp"
     volumes:
       - ${APP_DATA_DIR}/data/node:/data
-    entrypoint:
-      - bitcoind
-    command:
-      - -datadir=/data
-      - -conf=/data/bitcoin.conf
 
   ckpool:
     image: ghcr.io/willitmod/docker-ckpool-solo:590fb2a
     user: "1000:1000"
     restart: on-failure
     depends_on:
-      - bsvd
+      - btc2d
       - init
     stop_grace_period: 30s
     init: true
     ports:
-      - "8901:3333/tcp"
+      - "2345:3333/tcp"
     volumes:
       - ${APP_DATA_DIR}/data/pool/config:/config:ro
       - ${APP_DATA_DIR}/data/pool/www:/www
@@ -189,29 +150,33 @@ services:
         fi
 
   app:
-    image: ghcr.io/willitmod/axebsv-app-umbrel-dev:0.7.176
+    image: ghcr.io/willitmod/axebc2-app-umbrel-dev:0.1.4
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
+    depends_on:
+      - btc2d
+      - ckpool
+      - init
     networks:
       default:
         aliases:
-          - axebsv-app
+          - axebc2-app
       umbrel_main_network:
         aliases:
-          - axebsv-app
+          - axebc2-app
     volumes:
       - ${APP_DATA_DIR}/data:/data
     environment:
       NETWORK_IP: "${NETWORK_IP}"
       STATIC_DIR: "/app/static"
       APP_CHANNEL: "ALPHA"
-      BSVD_IMAGE: "bitcoinsv/bitcoin-sv:1.2.0"
+      BTC2D_IMAGE: "ghcr.io/willitmod/bitcoinii-core:29.1.0"
       CKPOOL_IMAGE: "ghcr.io/willitmod/docker-ckpool-solo:590fb2a"
-      BSV_RPC_HOST: "bsvd"
-      BSV_RPC_PORT: "8332"
-      BSV_RPC_USER: "bsv"
-      BSV_RPC_PASS: "${APP_PASSWORD}"
+      BTC2_RPC_HOST: "btc2d"
+      BTC2_RPC_PORT: "8337"
+      BTC2_RPC_USER: "btc2"
+      BTC2_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
       CKPOOL_USERS_DIR: "/data/pool/www/users"
       CKPOOL_LOG_PATH: "/data/pool/www/ckpool.log"

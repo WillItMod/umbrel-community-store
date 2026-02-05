@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-dev-bsv
 category: bitcoin
 name: AxeBSV
-version: "0.7.173"
+version: "0.7.176"
 tagline: BSV node + solo pool
 description: >-
   IMPORTANT: AMD64/x86_64 only. ARM/arm64 (Raspberry Pi) is not supported because the BSV node image (bitcoinsv/bitcoin-sv:1.2.0) is amd64-only.
@@ -29,7 +29,7 @@ description: >-
 developer: WillItMod
 website: https://github.com/WillItMod/umbrel-community-store
 repo: https://github.com/WillItMod/umbrel-community-store
-support: https://github.com/WillItMod/umbrel-community-store/issues
+support: https://discord.gg/vC2UrFAbUF
 dependencies: []
 port: 21216
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-dev-bsv/icon.png

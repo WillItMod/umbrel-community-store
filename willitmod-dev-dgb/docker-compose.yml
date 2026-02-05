@@ -768,7 +768,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.142
+    image: ghcr.io/willitmod/axedgb-app:0.9.144-dev
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -793,7 +793,7 @@ services:
       MININGCORE_POOL_IDS: "sha256:dgb-sha256-1,scrypt:dgb-scrypt-1"
       STRATUM_PORTS: "sha256:5678,scrypt:5679"
       MININGCORE_CONF_PATH: "/data/pool/config/miningcore.json"
-      APP_CHANNEL: "BETA"
+      APP_CHANNEL: "RC1"
       DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.26.2"
       MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r24"
       POSTGRES_IMAGE: "postgres:16-alpine"

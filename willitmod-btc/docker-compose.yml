@@ -148,7 +148,7 @@ services:
     entrypoint: ["/bin/sh", "/ckpool-entrypoint.sh"]
 
   app:
-    image: ghcr.io/willitmod/axebtc-app-umbrel-dev:0.7.82.2-dev
+    image: ghcr.io/willitmod/axebtc-app-umbrel-dev:0.7.82.4-dev
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -170,7 +170,7 @@ services:
       BTC_RPC_USER: "btc"
       BTC_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
-      APP_CHANNEL: "BETA"
+      APP_CHANNEL: "RC1"
       BITCOIND_IMAGE: "ghcr.io/willitmod/axebtc-bitcoind-switch:0.7.44"
       CKPOOL_IMAGE: "ghcr.io/willitmod/docker-ckpool-solo:590fb2a"
       STATIC_DIR: "/app/static"
