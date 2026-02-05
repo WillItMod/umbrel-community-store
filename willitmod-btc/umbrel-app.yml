@@ -25,9 +25,9 @@ repo: https://github.com/WillItMod/umbrel-community-store
 support: https://discord.gg/vC2UrFAbUF
 dependencies: []
 port: 21215
-icon: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/65a7fdf/willitmod-btc/icon.png"
+icon: "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/logo.png"
 gallery:
-  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/65a7fdf/willitmod-btc/icon.png"
+  - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/logo.png"
   - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/1.png"
   - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/2.png"
   - "https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-btc/images/3.png"
