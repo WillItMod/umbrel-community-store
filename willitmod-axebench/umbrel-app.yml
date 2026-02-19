@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axebench
 category: bitcoin
 name: AxeBench
-version: "3.0.30"
+version: "3.0.29"
 tagline: Bitaxe fleet benchmarking and management
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/icon.png
 description: >-
@@ -25,6 +25,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  v3.0.30: Fix Nano 3S add flow compatibility and align runtime UI versioning.
+  v3.0.29: Roll back MAIN store image to last known stable runtime while 3.0.30 compatibility is investigated.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c
