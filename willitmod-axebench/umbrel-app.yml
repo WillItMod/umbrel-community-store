@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axebench
 category: bitcoin
 name: AxeBench
-version: "3.0.30"
+version: "3.0.29"
 tagline: Bitaxe fleet benchmarking and management
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/icon.png
 description: >-
@@ -25,6 +25,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  v3.0.30: Pulling DEV image immediately for current MAIN deployment test.
+  v3.0.29: Restored stable baseline image.
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c
