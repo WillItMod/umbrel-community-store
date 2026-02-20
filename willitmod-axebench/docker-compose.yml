@@ -7,7 +7,7 @@ services:
       APP_PORT: 5000
 
   server:
-    image: ghcr.io/willitmod/axebench:v4.0.10
+    image: ghcr.io/willitmod/axebench:v4.0.18
     restart: on-failure
     stop_grace_period: 30s
     init: true
@@ -17,3 +17,9 @@ services:
       HOME: /data
     volumes:
       - ${APP_DATA_DIR}/data:/data
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.50.0/24
