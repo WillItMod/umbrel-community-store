@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-axebench
 category: bitcoin
 name: AxeBench
-version: "4.0.10"
+version: "4.0.11"
 tagline: Bitaxe fleet benchmarking and management
 icon: https://raw.githubusercontent.com/WillItMod/umbrel-community-store/main/willitmod-axebench/icon.png
 description: >-
@@ -25,6 +25,6 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  v4.0.10: Fix blank dashboard (ReferenceError from missing normalizeString) so fleet stats and miner metrics render correctly.
+  v4.0.11: Fix Operations scheduler profile suggestions (show canonical profile keys; restore stock Nano3s/AvalonQ profiles even if migrated profiles file is empty).
 submitter: WillItMod
 submission: https://github.com/WillItMod/umbrel-community-store/commit/8f4826c
