@@ -825,7 +825,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.158
+    image: ghcr.io/willitmod/axedgb-app:0.9.162
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -856,7 +856,7 @@ services:
       # Treat workers as inactive (hashrate=0) after this many seconds with no activity.
       # (Activity = last accepted share when present, else minerstats snapshot time.)
       WORKER_ACTIVE_SECONDS: "300"
-      APP_CHANNEL: "RC2"
+      APP_CHANNEL: "RC3"
       DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.26.2"
       MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r24"
       POSTGRES_IMAGE: "postgres:16-alpine"
