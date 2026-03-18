@@ -2,7 +2,7 @@ manifestVersion: 1
 id: willitmod-dev-dgb
 category: altcoin
 name: AxeDGB
-version: "0.9.162"
+version: "0.9.166"
 tagline: DGB node + solo pool
 description: >-
   Run a DigiByte full node (DigiByte Core) and an integrated solo Stratum v1 pool (Miningcore) as a single app.
@@ -37,7 +37,7 @@ description: >-
 
 
   Status:
-    - RC2 build: expect minor bugs. Verify payout addresses before mining.
+    - RC3 build: expect minor bugs. Verify payout addresses before mining.
 developer: WillItMod
 website: https://github.com/WillItMod/umbrel-community-store
 repo: https://github.com/WillItMod/umbrel-community-store
