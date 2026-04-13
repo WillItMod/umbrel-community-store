@@ -1,0 +1,124 @@
+Business Source License 1.1
+
+License text copyright (c) 2017 MariaDB Corporation Ab.
+"Business Source License" is a trademark of MariaDB Corporation Ab.
+
+-----------------------------------------------------------------------------
+IMPORTANT: COMMERCIAL USE & REDISTRIBUTION (SUMMARY)
+-----------------------------------------------------------------------------
+
+YOU MAY NOT (without a separate commercial license from the Licensor):
+- Sell, offer for sale, rent, lease, or otherwise distribute the Licensed Work
+  as a product or offering.
+- Ship, bundle, or pre-install the Licensed Work onto any hardware, image,
+  container, appliance, node, store, release bundle, or package for anyone
+  else, whether paid or unpaid.
+
+If you want to build, provision, distribute, or resell products that include
+the Licensed Work, you need a separate commercial license from the Licensor.
+See `COMMERCIAL_LICENSE.md`.
+
+NO FORK RULE:
+You may not create, publish, maintain, or redistribute public forks, mirrors,
+or derivative distributions of this repository or its contents without explicit
+written permission from the Licensor. See `NO_FORK_POLICY.md`.
+
+-----------------------------------------------------------------------------
+Parameters
+-----------------------------------------------------------------------------
+
+Licensor: Hurricane Cloud Solutions LTD (trading as "5tratum")
+Project/maintainer: WillItMod
+
+Licensed Work: The contents of this repository (including source code, app
+recipes, build or release metadata, binaries, documentation, images, and
+related materials), excluding third-party components under their own licenses.
+
+The Licensed Work is (c) Hurricane Cloud Solutions LTD and other contributors.
+
+Additional Use Grant:
+  You may use, copy, modify, and run the Licensed Work for personal,
+  noncommercial, internal business use (including use on your own hardware),
+  provided you do not violate the "Restrictions" below.
+
+  You may redistribute unmodified copies of the Licensed Work for the sole
+  purpose of noncommercial evaluation, provided you retain all notices, do not
+  bundle it with hardware/devices, do not use it for resale, and do not use
+  WillItMod, AxeSuite, Axe app, or 5tratum trademarks or branding except as
+  permitted by `TRADEMARK.md`.
+
+Restrictions:
+  The following are not permitted without a separate commercial license from
+  the Licensor:
+  - Rebranding, representing as your own, or distributing a fork/derivative
+    product under the same or confusingly similar branding.
+  - Flashing, writing, cloning, pre-installing, bundling, mirroring, or
+    redistributing the Licensed Work onto any device, disk, USB drive, SSD/HDD,
+    SD card, container image, appliance, store feed, or release bundle for
+    distribution or sale.
+  - Distributing the Licensed Work (modified or unmodified) as a product
+    offering (commercial or noncommercial), including app stores, releases,
+    installers, containers, images, appliances, or bundled packages, except as
+    explicitly allowed in the Additional Use Grant.
+  - Offering the Licensed Work (or a derivative) as a hosted service or
+    managed offering, or otherwise using it to provide a competing product or
+    service.
+  - Creating or publishing forks, mirrors, or derivative distributions of this
+    repository or its contents for redistribution.
+
+Change Date: 2099-01-01
+
+Change License: Apache License, Version 2.0
+
+-----------------------------------------------------------------------------
+Terms
+-----------------------------------------------------------------------------
+
+The Business Source License (this document, or the "License") is not an Open
+Source license. However, the Licensed Work will eventually be made available
+under an Open Source License, as stated in the Change License, on the Change
+Date.
+
+License grant
+
+Subject to the terms and conditions of this License, the Licensor hereby
+grants you a non-exclusive, worldwide, non-transferable, royalty-free license
+to use, copy, modify, create derivative works, and redistribute the Licensed
+Work, in whole or in part, solely as authorized by the Additional Use Grant
+and subject to the Restrictions above.
+
+If you would like to use the Licensed Work in any way that is not permitted by
+this License, you must contact the Licensor to obtain a commercial license.
+
+Notice
+
+You must ensure that anyone who receives a copy of the Licensed Work from you
+also receives a copy of this License.
+
+Trademarks
+
+This License does not grant any rights to use the Licensor's trademarks,
+service marks, or logos. See `TRADEMARK.md` and `NO_FORK_POLICY.md`.
+
+Third-party components
+
+Third-party components (including dependencies, libraries, tools, and bundled
+upstream projects) are not covered by this License and remain under their
+respective licenses.
+
+Disclaimer of warranty
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS IN THE LICENSED WORK.
+
+-----------------------------------------------------------------------------
+Full license text
+-----------------------------------------------------------------------------
+
+This repository uses the Business Source License 1.1. The full text of BSL 1.1
+is available at:
+  https://mariadb.com/bsl11/
