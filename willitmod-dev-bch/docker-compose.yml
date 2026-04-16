@@ -164,7 +164,7 @@ services:
         fi
 
   bchn:
-    image: mainnet/bitcoin-cash-node:v28.0.1
+    image: ghcr.io/willitmod/bitcoin-cash-node:v29.0.0-wm2
     user: "1000:1000"
     restart: unless-stopped
     stop_grace_period: 15m30s
@@ -185,7 +185,7 @@ services:
       start_period: 2m
 
   ckpool:
-    image: ghcr.io/getumbrel/docker-ckpool-solo:590fb2a
+    image: ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a
     entrypoint: ["/bin/sh"]
     command:
       - -ec
@@ -217,7 +217,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/www:/www
 
   app:
-    image: ghcr.io/willitmod/axebch-app-umbrel-dev:0.7.153
+    image: ghcr.io/willitmod/axebch-app-umbrel-dev:0.9.0
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -240,9 +240,9 @@ services:
       BCH_RPC_USER: "bch"
       BCH_RPC_PASS: "${APP_PASSWORD}"
       CKPOOL_STATUS_DIR: "/data/pool/www/pool"
-      APP_CHANNEL: "STABLE"
-      BCHN_IMAGE: "mainnet/bitcoin-cash-node:v28.0.1"
-      CKPOOL_IMAGE: "ghcr.io/getumbrel/docker-ckpool-solo:590fb2a"
+      APP_CHANNEL: "RC1"
+      BCHN_IMAGE: "ghcr.io/willitmod/bitcoin-cash-node:v29.0.0-wm2"
+      CKPOOL_IMAGE: "ghcr.io/willitmod/wim-solo-ckpool:0.8.3-rc1-590fb2a"
       STATIC_DIR: "/app/static"
 
 networks:
