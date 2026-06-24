@@ -2,9 +2,16 @@ manifestVersion: 1
 id: willitmod-dev-dgb
 category: altcoin
 name: AxeDGB
-version: "0.9.166"
+version: "0.9.172"
 tagline: DGB node + solo pool
 description: >-
+  RC3 RELEASE
+
+  AxeDGB is functional and has successfully found blocks. This release includes
+  restart/update stability work and more conservative node memory defaults.
+
+  Verify payout addresses before mining and send helpful feedback if anything behaves oddly.
+
   Run a DigiByte full node (DigiByte Core) and an integrated solo Stratum v1 pool (Miningcore) as a single app.
 
 
@@ -27,7 +34,7 @@ description: >-
     - Payout address must be a legacy/base58 DigiByte address (starts with `D`/`S`). `dgb1...` payout is not supported yet.
     - Initial sync can take a long time and a lot of bandwidth/storage (the node downloads and validates the chain).
     - Like most chains, transactions may include arbitrary data; use at your own risk and comply with local laws.
-    - First sync and the first boot after some upgrades can be heavy on RAM and disk. 16GB is recommended; 8GB is the practical minimum.
+    - First sync and the first boot after some upgrades can be heavy on RAM and disk. SSD/NVMe storage is strongly recommended. 16GB is recommended; 8GB is the practical minimum.
     - Solo mining is extremely unlikely to find blocks without significant hashrate.
 
 
@@ -37,7 +44,7 @@ description: >-
 
 
   Status:
-    - RC3 build: expect minor bugs. Verify payout addresses before mining.
+    - RC3 build: expect minor bugs. This update reduces restart/update disk load on HDD-backed nodes and makes Auto dbcache more conservative.
 developer: WillItMod
 website: https://github.com/WillItMod/umbrel-community-store
 repo: https://github.com/WillItMod/umbrel-community-store

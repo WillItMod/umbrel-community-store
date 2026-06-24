@@ -28,10 +28,14 @@ services:
         mkdir -p /data/pool/postgres
         chown -R 70:70 /data/pool/postgres || true
         chmod 700 /data/pool/postgres || true
-        # Ensure the UI can update digibyte.conf (/data/node). If this becomes
-        # root-owned, Settings will fail with Errno 13 permission denied.
-        mkdir -p /data/node
-        chown -R 1000:1000 /data/node || true
+        # Ensure app-writable state dirs stay owned by the UI user.
+        # Do not recursively chown /data/node: on a synced chain this can hammer HDDs
+        # for a long time during every update/restart.
+        mkdir -p /data/node /data/pool/config /data/ui/state /data/templates
+        chown 1000:1000 /data/node || true
+        chown -R 1000:1000 /data/pool/config || true
+        chown -R 1000:1000 /data/ui/state || true
+        chown -R 1000:1000 /data/templates || true
 
   perm_watchdog:
     image: alpine:3.22.1
@@ -46,6 +50,23 @@ services:
         # Some hosts/app-update flows can clobber Postgres ownership while the stack is running
         # (e.g., blanket chown of the app state dir). Watch for it and self-heal.
         pg_dir="/data/pool/postgres"
+        check_ui_dir() {
+          dir="$$1"
+          label="$$2"
+          mode="$${3:-recursive}"
+          if [ -d "$$dir" ]; then
+            uid="$$(stat -c '%u' "$$dir" 2>/dev/null || echo '')"
+            gid="$$(stat -c '%g' "$$dir" 2>/dev/null || echo '')"
+            if [ "$$uid" != "1000" ] || [ "$$gid" != "1000" ]; then
+              echo "[axedgb] Fixing $$label ownership (1000:1000)"
+              if [ "$$mode" = "top" ]; then
+                chown 1000:1000 "$$dir" 2>/dev/null || true
+              else
+                chown -R 1000:1000 "$$dir" 2>/dev/null || true
+              fi
+            fi
+          fi
+        }
         while true; do
           if [ -d "$$pg_dir" ]; then
             uid="$$(stat -c '%u' "$$pg_dir" 2>/dev/null || echo '')"
@@ -56,6 +77,10 @@ services:
               chmod 700 "$$pg_dir" 2>/dev/null || true
             fi
           fi
+          check_ui_dir /data/node "node dir" top
+          check_ui_dir /data/pool/config "pool config dir"
+          check_ui_dir /data/ui/state "UI state dir"
+          check_ui_dir /data/templates "templates dir"
           sleep 5
         done
 
@@ -116,6 +141,133 @@ services:
         fi
 
         mkdir -p /data/node /data/pool/config /data/pool/postgres /data/templates
+        mkdir -p /data/ui/state
+
+        # Refresh the mounted node entrypoint on every update. Older installs keep
+        # this file in persistent data, so app updates must overwrite stale copies.
+        cat > /data/templates/dgb-entrypoint.sh <<'DGB_ENTRYPOINT'
+        #!/bin/sh
+        set -eu
+
+        echo "[axedgb] DGB entrypoint starting"
+
+        if ! command -v digibyted >/dev/null 2>&1; then
+          echo "[axedgb] ERROR: digibyted not found in PATH"
+          exit 127
+        fi
+
+        heal_node_json() {
+          file="$$1"
+          name="$$2"
+          [ -e "$$file" ] || return 0
+
+          if [ ! -s "$$file" ]; then
+            ts="$$(date +%Y%m%dT%H%M%SZ 2>/dev/null || date +%s)"
+            echo "[axedgb] Removing empty $$name: $$file"
+            mv "$$file" "$$file.bad.$$ts" 2>/dev/null || rm -f "$$file" || true
+            return 0
+          fi
+
+          if command -v jq >/dev/null 2>&1; then
+            if ! jq -e 'type == "object"' < "$$file" >/dev/null 2>&1; then
+              ts="$$(date +%Y%m%dT%H%M%SZ 2>/dev/null || date +%s)"
+              echo "[axedgb] Quarantining malformed $$name: $$file"
+              mv "$$file" "$$file.bad.$$ts" 2>/dev/null || rm -f "$$file" || true
+            fi
+          fi
+        }
+
+        if [ "$$(id -u)" = "0" ]; then
+          mkdir -p /data || true
+          chown 1000:1000 /data 2>/dev/null || true
+          chmod 755 /data 2>/dev/null || true
+          [ -f /data/digibyte.conf ] && chown 1000:1000 /data/digibyte.conf 2>/dev/null || true
+          [ -f /data/.dbcache_mb ] && chown 1000:1000 /data/.dbcache_mb 2>/dev/null || true
+          [ -f /data/settings.json ] && chown 1000:1000 /data/settings.json 2>/dev/null || true
+        fi
+
+        heal_node_json /data/settings.json "DigiByte settings file"
+
+        extra=""
+        if [ -f /data/.reindex-chainstate ]; then
+          echo "[axedgb] Reindex requested (chainstate)."
+          rm -f /data/.reindex-chainstate || true
+          extra="-reindex-chainstate"
+        fi
+
+        dbcache="$${DGB_DBCACHE_MB:-}"
+        if [ -z "$$dbcache" ] && [ -f /data/.dbcache_mb ]; then
+          raw="$$(cat /data/.dbcache_mb 2>/dev/null | tr -d ' \t\r\n' || true)"
+          case "$$raw" in
+            ""|auto|AUTO)
+              dbcache=""
+              ;;
+            *[!0-9]*)
+              echo "[axedgb] WARNING: invalid /data/.dbcache_mb value, ignoring"
+              dbcache=""
+              ;;
+            *)
+              dbcache="$$raw"
+              ;;
+          esac
+        fi
+
+        if [ -z "$$dbcache" ] && [ -r /proc/meminfo ]; then
+          mem_kb="$$(awk '/^MemTotal:/ {print $$2}' /proc/meminfo 2>/dev/null || true)"
+          if [ -n "$$mem_kb" ]; then
+            mem_mb="$$((mem_kb / 1024))"
+            # Keep Auto conservative because users often run BCH/DGB/other nodes together,
+            # and HDD-backed systems suffer badly when validation and swapping collide.
+            if [ "$$mem_mb" -ge 8192 ]; then
+              dbcache="4096"
+            else
+              dbcache="2048"
+            fi
+          fi
+        fi
+
+        if [ -n "$$dbcache" ] && echo "$$dbcache" | grep -Eq '^[0-9]+$$'; then
+          if [ "$$dbcache" -lt 1024 ]; then
+            echo "[axedgb] WARNING: dbcache=$$dbcache too low; clamping to 1024MB minimum"
+            dbcache="1024"
+          fi
+        fi
+
+        if [ -n "$$dbcache" ]; then
+          extra="$$extra -dbcache=$$dbcache"
+        fi
+
+        echo "[axedgb] Exec: digibyted -datadir=/data -printtoconsole $$extra"
+        exec digibyted -datadir=/data -printtoconsole $$extra
+        DGB_ENTRYPOINT
+        chmod 755 /data/templates/dgb-entrypoint.sh || true
+        chown 1000:1000 /data/templates/dgb-entrypoint.sh || true
+
+        heal_json_file() {
+          file="$$1"
+          label="$$2"
+          action="$${3:-quarantine}"
+          [ -e "$$file" ] || return 0
+
+          bad="0"
+          if [ ! -s "$$file" ]; then
+            bad="1"
+          elif command -v jq >/dev/null 2>&1; then
+            if ! jq -e '.' < "$$file" >/dev/null 2>&1; then
+              bad="1"
+            fi
+          fi
+
+          if [ "$$bad" = "1" ]; then
+            ts="$$(date +%Y%m%dT%H%M%SZ 2>/dev/null || date +%s)"
+            echo "[axedgb] Self-heal: $$label is empty or malformed"
+            if [ "$$action" = "remove" ]; then
+              rm -f "$$file" || true
+            else
+              mv "$$file" "$$file.bad.$$ts" 2>/dev/null || rm -f "$$file" || true
+            fi
+          fi
+        }
 
         # Postgres runs as uid:gid 70:70 in the official alpine images.
         # Ensure the bind-mounted datadir is writable to avoid "pg_filenode.map: Permission denied" on upgrades.
@@ -127,6 +279,18 @@ services:
           chown -R 70:70 "$$pg_dir" 2>/dev/null || true
         fi
         chmod 700 "$$pg_dir" 2>/dev/null || true
+        chown 1000:1000 /data/node 2>/dev/null || true
+        for f in /data/node/digibyte.conf /data/node/settings.json /data/node/.dbcache_mb; do
+          [ -e "$$f" ] && chown 1000:1000 "$$f" 2>/dev/null || true
+        done
+        chown -R 1000:1000 /data/pool/config /data/ui/state /data/templates 2>/dev/null || true
+
+        # Self-heal empty/malformed app state before the node or UI consumes it.
+        heal_json_file /data/node/settings.json "DigiByte settings file"
+        heal_json_file /data/ui/state/pool_settings.json "pool settings state"
+        heal_json_file /data/ui/state/boot_repair.json "boot repair state"
+        heal_json_file /data/pool/config/miningcore.json "Miningcore config"
+        heal_json_file /data/pool/config/coins.json "Miningcore coins config" remove
 
         # Ensure dbcache preset exists. The UI can change this later.
         if [ ! -f /data/node/.dbcache_mb ]; then
@@ -135,9 +299,9 @@ services:
         else
           raw="$$(cat /data/node/.dbcache_mb 2>/dev/null | tr -d ' \t\r\n' || true)"
           if echo "$$raw" | grep -Eq '^[0-9]+$$'; then
-            if [ "$$raw" -lt 6144 ]; then
-              echo "[axedgb] Bumping dbcache preset to 6144MB minimum"
-              echo "6144" > /data/node/.dbcache_mb
+            if [ "$$raw" -lt 4096 ]; then
+              echo "[axedgb] Bumping dbcache preset to 4096MB minimum"
+              echo "4096" > /data/node/.dbcache_mb
               chown 1000:1000 /data/node/.dbcache_mb || true
             fi
           fi
@@ -150,7 +314,7 @@ services:
 
         if [ ! -f /data/node/digibyte.conf ]; then
           envsubst < /data/templates/digibyte.conf.template > /data/node/digibyte.conf
-          chown -R 1000:1000 /data/node
+          chown 1000:1000 /data/node /data/node/digibyte.conf 2>/dev/null || true
         else
           if ! grep -q '^maxconnections=' /data/node/digibyte.conf; then
             echo "[axedgb] Adding maxconnections=64 to digibyte.conf"
@@ -321,10 +485,6 @@ services:
           fi
         fi
 
-        # Ensure the UI (uid 1000) can persist Settings changes even if this file
-        # was created/replaced by root during init/upgrade.
-        chown 1000:1000 /data/node/digibyte.conf 2>/dev/null || true
-
         miningcore_conf="/data/pool/config/miningcore.json"
         miningcore_tpl="/data/templates/miningcore.json.template"
 
@@ -410,9 +570,9 @@ services:
                    "enabled": $$enabled,
                    "coin": "digibyte-scrypt",
                    "address": $$addr,
-                 "blockRefreshInterval": 2000,
-                 "jobRebroadcastTimeout": 60,
-                 "clientConnectionTimeout": 600,
+                   "blockRefreshInterval": 2000,
+                   "jobRebroadcastTimeout": 60,
+                   "clientConnectionTimeout": 600,
                    "paymentProcessing": {"enabled": false},
                    "banning": {"enabled": true, "time": 600, "invalidPercent": 50, "checkThreshold": 50},
                    "ports": {
@@ -446,26 +606,30 @@ services:
               if ! echo "$$desired_startdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_startdiff=""; fi
               if ! echo "$$desired_maxdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_maxdiff=""; fi
 
-              # Only accept legacy/base58 payout addresses here. Bech32 (dgb1...) will be rejected by Miningcore.
-              if echo "$$desired_addr" | grep -qE '^[DS][1-9A-HJ-NP-Za-km-z]{25,60}$$'; then
-                echo "[axedgb] Applying payout address + varDiff settings from $$settings"
-                tmp_apply="/data/pool/config/miningcore.json.tmp_apply"
-                jq --arg addr "$$desired_addr" \
-                   --argjson mindiff "$${desired_mindiff:-0}" \
-                   --argjson startdiff "$${desired_startdiff:-0}" \
-                   --argjson maxdiff "$${desired_maxdiff:-0}" \
-                   '
-                   .[0]
-                   |
-                   def apply_port(p):
+                # Only accept legacy/base58 payout addresses here. Bech32 (dgb1...) will be rejected by Miningcore.
+                if echo "$$desired_addr" | grep -qE '^[DS][1-9A-HJ-NP-Za-km-z]{25,60}$$'; then
+                  echo "[axedgb] Applying payout address + varDiff settings from $$settings"
+                  mindiff_arg="0"
+                  startdiff_arg="0"
+                  maxdiff_arg="0"
+                  if [ -n "$$desired_mindiff" ]; then mindiff_arg="$$desired_mindiff"; fi
+                  if [ -n "$$desired_startdiff" ]; then startdiff_arg="$$desired_startdiff"; fi
+                  if [ -n "$$desired_maxdiff" ]; then maxdiff_arg="$$desired_maxdiff"; fi
+                  tmp_apply="/data/pool/config/miningcore.json.tmp_apply"
+                  jq --arg addr "$$desired_addr" \
+                     --argjson mindiff "$$mindiff_arg" \
+                     --argjson startdiff "$$startdiff_arg" \
+                     --argjson maxdiff "$$maxdiff_arg" \
+                     '
+                     .[0]
+                     |
+                     def apply_port(p):
                      p
                      | .listenAddress = "0.0.0.0"
                      | (if ($$startdiff > 0) then .difficulty = $$startdiff else . end)
+                     | (.varDiff |= (if type=="object" then . else {} end))
                      | (if ($$mindiff > 0) then .varDiff.minDiff = $$mindiff else . end)
-                     | (if ($$maxdiff > 0) then .varDiff.maxDiff = $$maxdiff else .varDiff.maxDiff = null end)
-                      | (.varDiff.targetTime = 15)
-                      | (.varDiff.retargetTime = 120)
-                      | (.varDiff.variancePercent = 50);
+                     | (if ($$maxdiff > 0) then .varDiff.maxDiff = $$maxdiff else .varDiff.maxDiff = null end);
 
                    (.pools |= (if type=="array" then map(
                      if (.id=="dgb-sha256-1") then
@@ -474,7 +638,8 @@ services:
                        | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then apply_port(.) else . end)) else . end))
                      elif (.id=="dgb-scrypt-1") then
                        (.enabled = true)
-                     | (.address = $$addr)
+                       | (.address = $$addr)
+                       | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then apply_port(.) else . end)) else . end))
                    else . end
                  ) else . end))
                    ' -s /data/pool/config/miningcore.json > "$$tmp_apply" && mv "$$tmp_apply" /data/pool/config/miningcore.json
@@ -491,11 +656,14 @@ services:
               tmp3="/data/pool/config/miningcore.json.tmp3"
               jq '
                 .[0]
-                | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
-                  | .enabled=true
-                  | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
-                  | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
-                ) | .
+                | (.pools |= (if type=="array" then map(
+                    if type=="object" and (.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") then
+                      (.enabled=true)
+                      | (.address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC")
+                      | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
+                    else .
+                    end
+                  ) else . end))
               ' -s /data/pool/config/miningcore.json > "$$tmp3" && mv "$$tmp3" /data/pool/config/miningcore.json
             fi
           fi
@@ -526,25 +694,29 @@ services:
             if ! echo "$$desired_startdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_startdiff=""; fi
             if ! echo "$$desired_maxdiff" | grep -qE '^[0-9]+(\\.[0-9]+)?$$'; then desired_maxdiff=""; fi
 
-            if echo "$$desired_addr" | grep -qE '^[DS][1-9A-HJ-NP-Za-km-z]{25,60}$$'; then
-              echo "[axedgb] Applying payout address + varDiff settings from $$settings (post-repair pass)"
-              tmp_apply="/data/pool/config/miningcore.json.tmp_apply2"
-              jq --arg addr "$$desired_addr" \
-                 --argjson mindiff "$${desired_mindiff:-0}" \
-                 --argjson startdiff "$${desired_startdiff:-0}" \
-                 --argjson maxdiff "$${desired_maxdiff:-0}" \
-                 '
-                 .[0]
-                 |
-                 def apply_port(p):
+              if echo "$$desired_addr" | grep -qE '^[DS][1-9A-HJ-NP-Za-km-z]{25,60}$$'; then
+                echo "[axedgb] Applying payout address + varDiff settings from $$settings (post-repair pass)"
+                mindiff_arg="0"
+                startdiff_arg="0"
+                maxdiff_arg="0"
+                if [ -n "$$desired_mindiff" ]; then mindiff_arg="$$desired_mindiff"; fi
+                if [ -n "$$desired_startdiff" ]; then startdiff_arg="$$desired_startdiff"; fi
+                if [ -n "$$desired_maxdiff" ]; then maxdiff_arg="$$desired_maxdiff"; fi
+                tmp_apply="/data/pool/config/miningcore.json.tmp_apply2"
+                jq --arg addr "$$desired_addr" \
+                   --argjson mindiff "$$mindiff_arg" \
+                   --argjson startdiff "$$startdiff_arg" \
+                   --argjson maxdiff "$$maxdiff_arg" \
+                   '
+                   .[0]
+                   |
+                   def apply_port(p):
                    p
                    | .listenAddress = "0.0.0.0"
                    | (if ($$startdiff > 0) then .difficulty = $$startdiff else . end)
+                   | (.varDiff |= (if type=="object" then . else {} end))
                    | (if ($$mindiff > 0) then .varDiff.minDiff = $$mindiff else . end)
-                   | (if ($$maxdiff > 0) then .varDiff.maxDiff = $$maxdiff else .varDiff.maxDiff = null end)
-                   | (.varDiff.targetTime = 15)
-                   | (.varDiff.retargetTime = 120)
-                   | (.varDiff.variancePercent = 50);
+                   | (if ($$maxdiff > 0) then .varDiff.maxDiff = $$maxdiff else .varDiff.maxDiff = null end);
 
                  (.pools |= (if type=="array" then map(
                    if (.id=="dgb-sha256-1") then
@@ -554,6 +726,7 @@ services:
                    elif (.id=="dgb-scrypt-1") then
                      (.enabled = true)
                      | (.address = $$addr)
+                     | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then apply_port(.) else . end)) else . end))
                    else . end
                    ) else . end))
                  ' -s "$$miningcore_conf" > "$$tmp_apply" && mv "$$tmp_apply" "$$miningcore_conf"
@@ -567,11 +740,14 @@ services:
             tmp3="/data/pool/config/miningcore.json.tmp_lock"
             jq '
               .[0]
-              | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
-                | .enabled=true
-                | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
-                | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
-              ) | .
+              | (.pools |= (if type=="array" then map(
+                  if type=="object" and (.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") then
+                    (.enabled=true)
+                    | (.address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC")
+                    | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
+                  else .
+                  end
+                ) else . end))
             ' -s "$$miningcore_conf" > "$$tmp3" && mv "$$tmp3" "$$miningcore_conf"
           fi
 
@@ -586,11 +762,14 @@ services:
             tmp_lock="/data/pool/config/miningcore.json.tmp_lock2"
             jq '
               .[0]
-              | (.pools[]? | select(.id=="dgb-sha256-1" or .id=="dgb-scrypt-1")
-                | .enabled=true
-                | .address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC"
-                | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
-              ) | .
+              | (.pools |= (if type=="array" then map(
+                  if type=="object" and (.id=="dgb-sha256-1" or .id=="dgb-scrypt-1") then
+                    (.enabled=true)
+                    | (.address="D596YFweJQuHY1BbjazZYmAbt8jJPbKehC")
+                    | (.ports |= (if type=="object" then with_entries(.value |= (if type=="object" then (.listenAddress="127.0.0.1") else . end)) else . end))
+                  else .
+                  end
+                ) else . end))
             ' -s "$$miningcore_conf" > "$$tmp_lock" && mv "$$tmp_lock" "$$miningcore_conf"
             chown -R 1000:1000 /data/pool/config || true
             mc_repaired="1"
@@ -609,7 +788,7 @@ services:
             --arg desired "$$desired_addr" \
             --arg addr "$$applied_addr" \
             --arg locked "$$stratum_locked" \
-            '{t:$ts,miningcoreRepaired:($repaired=="1"),settingsApplied:($applied=="1"),desiredPayout:$desired,appliedPayout:$addr,stratumLocked:($locked=="1")}' \
+            '{t:$$ts,miningcoreRepaired:($$repaired=="1"),settingsApplied:($$applied=="1"),desiredPayout:$$desired,appliedPayout:$$addr,stratumLocked:($$locked=="1")}' \
             > "$$boot_repair" 2>/dev/null || true
           chown 1000:1000 "$$boot_repair" 2>/dev/null || true
         fi
@@ -825,7 +1004,7 @@ services:
       - ${APP_DATA_DIR}/data/pool/config/coins.json:/app/coins.json:ro
 
   app:
-    image: ghcr.io/willitmod/axedgb-app:0.9.166
+    image: ghcr.io/willitmod/axedgb-app:0.9.172
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 30s
@@ -848,6 +1027,11 @@ services:
       DGB_RPC_USER: "dgb"
       DGB_RPC_PASS: "${APP_PASSWORD}"
       NETWORK_IP: "${NETWORK_IP}"
+      PGHOST: "postgres"
+      PGPORT: "5432"
+      PGDATABASE: "miningcore"
+      PGUSER: "miningcore"
+      PGPASSWORD: "${APP_PASSWORD}"
       MININGCORE_API_URL: "http://miningcore:4000"
       MININGCORE_POOL_ID: "dgb-sha256-1"
       MININGCORE_POOL_IDS: "sha256:dgb-sha256-1,scrypt:dgb-scrypt-1"
@@ -857,6 +1041,7 @@ services:
       # (Activity = last accepted share when present, else minerstats snapshot time.)
       WORKER_ACTIVE_SECONDS: "300"
       APP_CHANNEL: "RC3"
+      APP_VERSION_SUFFIX: ""
       DGB_IMAGE: "ghcr.io/willitmod/digibyte:8.26.2"
       MININGCORE_IMAGE: "ghcr.io/willitmod/axedgb-miningcore:axedgb-0.8.10-r24"
       POSTGRES_IMAGE: "postgres:16-alpine"
